@@ -2,6 +2,8 @@ package simpledb;
 
 import java.util.NoSuchElementException;
 
+import com.sun.org.slf4j.internal.LoggerFactory;
+import com.sun.org.slf4j.internal.Logger;
 import org.junit.Test;
 
 import simpledb.common.Type;

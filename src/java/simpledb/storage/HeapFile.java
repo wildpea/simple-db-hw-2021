@@ -1,9 +1,9 @@
 package simpledb.storage;
 
+import com.sun.org.slf4j.internal.Logger;
+import com.sun.org.slf4j.internal.LoggerFactory;
 import simpledb.common.Database;
 import simpledb.common.DbException;
-import simpledb.common.Debug;
-import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -22,6 +22,13 @@ import java.util.*;
  */
 public class HeapFile implements DbFile {
 
+    private static final Logger log = LoggerFactory.getLogger(HeapFile.class);
+
+    private File f;
+    private TupleDesc td;
+    private Map<Integer, HeapPage> pages = new HashMap<>();
+    private int pgNo = 0;
+
     /**
      * Constructs a heap file backed by the specified file.
      * 
@@ -30,7 +37,9 @@ public class HeapFile implements DbFile {
      *            file.
      */
     public HeapFile(File f, TupleDesc td) {
-        // some code goes here
+        // wildpea
+        this.f = f;
+        this.td = td;
     }
 
     /**
@@ -39,8 +48,8 @@ public class HeapFile implements DbFile {
      * @return the File backing this HeapFile on disk.
      */
     public File getFile() {
-        // some code goes here
-        return null;
+        // wildpea
+        return f;
     }
 
     /**
@@ -52,9 +61,10 @@ public class HeapFile implements DbFile {
      * 
      * @return an ID uniquely identifying this HeapFile.
      */
+    @Override
     public int getId() {
-        // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        // wildpea
+        return f.getAbsoluteFile().hashCode();
     }
 
     /**
@@ -62,18 +72,42 @@ public class HeapFile implements DbFile {
      * 
      * @return TupleDesc of this DbFile.
      */
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        throw new UnsupportedOperationException("implement this");
+        // wildpea
+        return td;
+    }
+
+    private void loadPage() {
+        try (FileInputStream is = new FileInputStream(f)) {
+            byte[] c = new byte[BufferPool.getPageSize()];
+            while (is.read(c) != -1) {
+                HeapPage page = new HeapPage(new HeapPageId(getId(), pgNo), c);
+                pages.put(pgNo, page);
+                pgNo++;
+            }
+        } catch (Exception e) {
+            System.out.println("error");
+            log.error("error", e);
+        }
     }
 
     // see DbFile.java for javadocs
+    @Override
     public Page readPage(PageId pid) {
-        // some code goes here
-        return null;
+        // wildpea
+        if (pages.size() == 0) {
+            loadPage();
+        }
+
+        if (pages.containsKey(pid.getPageNumber())) {
+            return pages.get(pid.getPageNumber());
+        }
+        throw new IllegalArgumentException("no such pgid");
     }
 
     // see DbFile.java for javadocs
+    @Override
     public void writePage(Page page) throws IOException {
         // some code goes here
         // not necessary for lab1
@@ -83,11 +117,15 @@ public class HeapFile implements DbFile {
      * Returns the number of pages in this HeapFile.
      */
     public int numPages() {
-        // some code goes here
-        return 0;
+        // wildpea
+        if (pages.size() == 0) {
+            loadPage();
+        }
+        return pages.size();
     }
 
     // see DbFile.java for javadocs
+    @Override
     public List<Page> insertTuple(TransactionId tid, Tuple t)
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
@@ -96,6 +134,7 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
+    @Override
     public ArrayList<Page> deleteTuple(TransactionId tid, Tuple t) throws DbException,
             TransactionAbortedException {
         // some code goes here
@@ -104,6 +143,7 @@ public class HeapFile implements DbFile {
     }
 
     // see DbFile.java for javadocs
+    @Override
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
         return null;

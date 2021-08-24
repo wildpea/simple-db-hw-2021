@@ -8,6 +8,7 @@ import simpledb.transaction.TransactionId;
 
 import java.util.*;
 import java.io.*;
+import java.util.stream.Stream;
 
 /**
  * Each instance of HeapPage stores data for one page of HeapFiles and 
@@ -72,8 +73,9 @@ public class HeapPage implements Page {
         @return the number of tuples on this page
     */
     private int getNumTuples() {        
-        // some code goes here
-        return 0;
+        // wildpea
+        // floor((BufferPool.getPageSize()*8) / (tuple size * 8 + 1))
+        return (int)Math.floor((BufferPool.getPageSize() * 8) / (td.getSize() * 8 + 1));
 
     }
 
@@ -81,10 +83,10 @@ public class HeapPage implements Page {
      * Computes the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      * @return the number of bytes in the header of a page in a HeapFile with each tuple occupying tupleSize bytes
      */
-    private int getHeaderSize() {        
-        
-        // some code goes here
-        return 0;
+    private int getHeaderSize() {
+        // wildpea
+        // ceiling(no. tuple slots / 8)
+        return (int)Math.ceil(numSlots / 8);
                  
     }
     
@@ -107,18 +109,18 @@ public class HeapPage implements Page {
     }
     
     public void setBeforeImage() {
-        synchronized(oldDataLock)
-        {
-        oldData = getPageData().clone();
+        synchronized(oldDataLock) {
+            oldData = getPageData().clone();
         }
     }
 
     /**
      * @return the PageId associated with this page.
      */
+    @Override
     public HeapPageId getId() {
-    // some code goes here
-    throw new UnsupportedOperationException("implement this");
+        // wildpea
+        return pid;
     }
 
     /**
@@ -128,11 +130,12 @@ public class HeapPage implements Page {
         // if associated bit is not set, read forward to the next tuple, and
         // return null.
         if (!isSlotUsed(slotId)) {
+
             for (int i=0; i<td.getSize(); i++) {
                 try {
                     dis.readByte();
                 } catch (IOException e) {
-                    throw new NoSuchElementException("error reading empty tuple");
+                    throw new NoSuchElementException(String.format("error reading empty tuple, %d", slotId));
                 }
             }
             return null;
@@ -287,16 +290,25 @@ public class HeapPage implements Page {
      * Returns the number of empty slots on this page.
      */
     public int getNumEmptySlots() {
-        // some code goes here
-        return 0;
+        // wildpea
+        int num = 0;
+        for (byte b : header) {
+            byte c = b;
+            for (int i = 0; i < 8; ++i) {
+                num += 1 - (c & 0x1);
+                c >>= 1;
+            }
+        }
+        return num;
     }
 
     /**
      * Returns true if associated slot on this page is filled.
      */
     public boolean isSlotUsed(int i) {
-        // some code goes here
-        return false;
+        // wildpea
+        byte b = header[i / 8];
+        return ((b >> (i % 8)) & 0x1) == 0x1;
     }
 
     /**
@@ -313,7 +325,36 @@ public class HeapPage implements Page {
      */
     public Iterator<Tuple> iterator() {
         // some code goes here
-        return null;
+
+        class TIterator implements Iterator<Tuple> {
+            private int cursor = 0;
+            private int index = 0;
+            private final int total = numSlots - getNumEmptySlots();
+
+            @Override
+            public boolean hasNext() {
+                return index < total;
+            }
+
+            @Override
+            public Tuple next() {
+                if (!hasNext()) {
+                    return null;
+                }
+                ++index;
+                while (cursor < numSlots) {
+                    byte b = header[cursor / 8];
+                    b >>= (cursor % 8);
+                    ++cursor;
+                    if ((b & 0x01) == 1) {
+                        return tuples[cursor - 1];
+                    }
+                }
+                return null;
+            }
+        }
+
+        return new TIterator();
     }
 
 }

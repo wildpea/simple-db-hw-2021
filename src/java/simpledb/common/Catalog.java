@@ -23,6 +23,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Catalog {
 
+    class Table {
+        DbFile file;
+        String name;
+        String pkeyField;
+        Table (DbFile file, String name, String pkeyField) {
+            this.file = file;
+            this.name = name;
+            this.pkeyField = pkeyField;
+        }
+    }
+
+    private Map<String, Table> tables = new HashMap<>();
+    private Map<Integer, String> tbMaps = new HashMap<>();
+
     /**
      * Constructor.
      * Creates a new, empty catalog.
@@ -41,7 +55,10 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        // wildpea
+        Table t = new Table(file, name, pkeyField);
+        tables.put(name, t);
+        tbMaps.put(file.getId(), name);
     }
 
     public void addTable(DbFile file, String name) {
@@ -64,8 +81,11 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // some code goes here
-        return 0;
+        // wildpea
+        if (tables.containsKey(name)) {
+            return tables.get(name).file.getId();
+        }
+        throw  new NoSuchElementException("no name");
     }
 
     /**
@@ -75,8 +95,11 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        // wildpea
+        if (tbMaps.containsKey(tableid)) {
+            return tables.get(tbMaps.get(tableid)).file.getTupleDesc();
+        }
+        throw new NoSuchElementException("no such tableid");
     }
 
     /**
@@ -86,28 +109,36 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
+        //wildpea
+        if (tbMaps.containsKey(tableid)) {
+            return tables.get(tbMaps.get(tableid)).file;
+        }
         return null;
     }
 
     public String getPrimaryKey(int tableid) {
-        // some code goes here
+        // wildpea
+        if (tbMaps.containsKey(tableid)) {
+            return tables.get(tbMaps.get(tableid)).pkeyField;
+        }
         return null;
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // some code goes here
-        return null;
+        // wildpea
+        return tbMaps.keySet().iterator();
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        // wildpea
+        return tbMaps.getOrDefault(id, null);
     }
     
     /** Delete all tables from the catalog */
     public void clear() {
-        // some code goes here
+        // wildpea
+        tables.clear();
+        tbMaps.clear();
     }
     
     /**
