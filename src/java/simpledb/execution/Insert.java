@@ -2,11 +2,16 @@ package simpledb.execution;
 
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.Utility;
 import simpledb.storage.BufferPool;
+import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
+
+import javax.xml.crypto.Data;
+import java.util.Arrays;
 
 /**
  * Inserts tuples read from the child operator into the tableId specified in the
@@ -15,6 +20,12 @@ import simpledb.transaction.TransactionId;
 public class Insert extends Operator {
 
     private static final long serialVersionUID = 1L;
+
+    private TransactionId t;
+    private OpIterator child;
+    private int tableId;
+    OpIterator[] children = new OpIterator[1];
+    private Tuple rst = null;
 
     /**
      * Constructor.
@@ -31,24 +42,49 @@ public class Insert extends Operator {
      */
     public Insert(TransactionId t, OpIterator child, int tableId)
             throws DbException {
-        // some code goes here
+        // wildpea
+        this.t = t;
+        this.child = child;
+        this.tableId = tableId;
+        children[0] = child;
     }
 
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        // wildpea
+        return Database.getCatalog().getTupleDesc(tableId);
     }
 
+    @Override
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        super.open();
+        child.open();
+        //insert
+        int num = 0;
+        try {
+            while (child.hasNext()) {
+                Database.getBufferPool().insertTuple(t, tableId, child.next());
+                ++num;
+            }
+        } catch (Exception e) {
+            throw new DbException("insert error");
+        }
+        TupleDesc oneIntColumns = Utility.getTupleDesc(1);
+        rst = new Tuple(oneIntColumns);
+        rst.setField(0, new IntField(num));
     }
 
+    @Override
     public void close() {
-        // some code goes here
+        // wildpea
+        child.close();
     }
 
+    @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child.rewind();
     }
 
     /**
@@ -64,19 +100,28 @@ public class Insert extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#insertTuple
      */
+    @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        // wildpea
+        Tuple rt = rst;
+        rst = null;
+        return rt;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        // wildpea
+        return children;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        // wildpea
+        this.children = children;
+        if (children.length >= 1) {
+            this.child = children[0];
+        } else {
+            this.child = null;
+        }
     }
 }
