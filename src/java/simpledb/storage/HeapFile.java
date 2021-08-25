@@ -1,9 +1,8 @@
 package simpledb.storage;
 
-import com.sun.org.slf4j.internal.Logger;
-import com.sun.org.slf4j.internal.LoggerFactory;
 import simpledb.common.Database;
 import simpledb.common.DbException;
+import simpledb.common.Permissions;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -22,12 +21,10 @@ import java.util.*;
  */
 public class HeapFile implements DbFile {
 
-    private static final Logger log = LoggerFactory.getLogger(HeapFile.class);
-
     private File f;
     private TupleDesc td;
-    private Map<Integer, HeapPage> pages = new HashMap<>();
-    private int pgNo = 0;
+    private Map<PageId, HeapPage> pages = new HashMap<>();
+    private int lastPgNo = -1;
 
     /**
      * Constructs a heap file backed by the specified file.
@@ -82,13 +79,13 @@ public class HeapFile implements DbFile {
         try (FileInputStream is = new FileInputStream(f)) {
             byte[] c = new byte[BufferPool.getPageSize()];
             while (is.read(c) != -1) {
-                HeapPage page = new HeapPage(new HeapPageId(getId(), pgNo), c);
-                pages.put(pgNo, page);
-                pgNo++;
+                lastPgNo++;
+                HeapPageId hpId = new HeapPageId(getId(), lastPgNo);
+                HeapPage page = new HeapPage(hpId, c);
+                pages.put(hpId, page);
             }
         } catch (Exception e) {
             System.out.println("error");
-            log.error("error", e);
         }
     }
 
@@ -100,8 +97,8 @@ public class HeapFile implements DbFile {
             loadPage();
         }
 
-        if (pages.containsKey(pid.getPageNumber())) {
-            return pages.get(pid.getPageNumber());
+        if (pages.containsKey(pid)) {
+            return pages.get(pid);
         }
         throw new IllegalArgumentException("no such pgid");
     }
@@ -145,8 +142,103 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     @Override
     public DbFileIterator iterator(TransactionId tid) {
-        // some code goes here
-        return null;
+        // wildpea
+        ;
+//        Page page = Database.getBufferPool().getPage(tid, , perm);
+
+
+        class TIterator implements DbFileIterator {
+            final private Permissions perm = Permissions.READ_ONLY;
+            private TransactionId tid;
+            Iterator<PageId> curPgIter;
+            private HeapPage curPage;
+            private Iterator<Tuple> iter;
+            private boolean opened = false;
+
+            TIterator(TransactionId tid) {
+                this.tid = tid;
+            }
+
+            @Override
+            public void open() throws DbException, TransactionAbortedException {
+                if (pages.size() == 0) {
+                    loadPage();
+                    if (pages.size() == 0) {
+                        throw new DbException("no data");
+                    }
+                }
+                rewind();
+                opened = true;
+            }
+
+            @Override
+            public boolean hasNext() throws DbException, TransactionAbortedException {
+                if (!opened) {
+                    return false;
+                }
+                if (iter == null) {
+                    if (!curPgIter.hasNext()) {
+                        return false;
+                    }
+
+                    curPage = (HeapPage) Database.getBufferPool().getPage(tid, (HeapPageId)curPgIter.next(), perm);
+                    iter = curPage.iterator();
+                }
+
+                if (iter.hasNext()) {
+                    return true;
+                }
+
+                while (curPgIter.hasNext()) {
+                    curPage = (HeapPage) Database.getBufferPool().getPage(tid, (HeapPageId)curPgIter.next(), perm);
+                    iter = curPage.iterator();
+                    if (iter.hasNext()) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            @Override
+            public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
+                if (!opened || iter == null) {
+                    throw new NoSuchElementException("not opened");
+                }
+                if (iter.hasNext()) {
+                    return iter.next();
+                }
+
+                while (curPgIter.hasNext()) {
+                    curPage = (HeapPage) Database.getBufferPool().getPage(tid, (HeapPageId)curPgIter.next(), perm);
+                    iter = curPage.iterator();
+
+                    if (iter.hasNext()) {
+                        return iter.next();
+                    }
+                }
+
+                return null;
+            }
+
+            @Override
+            public void rewind() throws DbException, TransactionAbortedException {
+                curPgIter = pages.keySet().iterator();
+                if (curPgIter.hasNext()) {
+                    curPage = (HeapPage) Database.getBufferPool().getPage(tid, (HeapPageId)curPgIter.next(), perm);
+                    iter = curPage.iterator();
+                } else {
+                    throw new DbException("no item");
+                }
+            }
+
+            @Override
+            public void close() {
+                opened = false;
+            }
+        }
+
+        return new TIterator(tid);
     }
 
 }

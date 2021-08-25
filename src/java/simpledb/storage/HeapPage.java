@@ -75,8 +75,7 @@ public class HeapPage implements Page {
     private int getNumTuples() {        
         // wildpea
         // floor((BufferPool.getPageSize()*8) / (tuple size * 8 + 1))
-        return (int)Math.floor((BufferPool.getPageSize() * 8) / (td.getSize() * 8 + 1));
-
+        return (int)Math.floor((BufferPool.getPageSize() * 8.0) / (td.getSize() * 8.0 + 1));
     }
 
     /**
@@ -86,8 +85,7 @@ public class HeapPage implements Page {
     private int getHeaderSize() {
         // wildpea
         // ceiling(no. tuple slots / 8)
-        return (int)Math.ceil(numSlots / 8);
-                 
+        return (int)Math.ceil(numSlots / 8.0);
     }
     
     /** Return a view of this page before it was modified
@@ -292,11 +290,16 @@ public class HeapPage implements Page {
     public int getNumEmptySlots() {
         // wildpea
         int num = 0;
+        int index = 0;
         for (byte b : header) {
             byte c = b;
             for (int i = 0; i < 8; ++i) {
                 num += 1 - (c & 0x1);
                 c >>= 1;
+                ++index;
+                if (index >= numSlots) {
+                    return num;
+                }
             }
         }
         return num;
@@ -307,6 +310,10 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // wildpea
+        if (i > numSlots) {
+            return false;
+        }
+
         byte b = header[i / 8];
         return ((b >> (i % 8)) & 0x1) == 0x1;
     }
@@ -324,7 +331,7 @@ public class HeapPage implements Page {
      * (note that this iterator shouldn't return tuples in empty slots!)
      */
     public Iterator<Tuple> iterator() {
-        // some code goes here
+        // wildpea
 
         class TIterator implements Iterator<Tuple> {
             private int cursor = 0;

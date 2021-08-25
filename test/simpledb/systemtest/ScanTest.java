@@ -31,6 +31,8 @@ public class ScanTest extends SimpleDbTestBase {
     /** Tests the scan operator for a table with the specified dimensions. */
     private void validateScan(int[] columnSizes, int[] rowSizes)
             throws IOException, DbException, TransactionAbortedException {
+//        int columns = 3;
+//        int rows = 1;
         for (int columns : columnSizes) {
             for (int rows : rowSizes) {
                 List<List<Integer>> tuples = new ArrayList<>();

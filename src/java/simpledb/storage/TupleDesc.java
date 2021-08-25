@@ -9,7 +9,7 @@ import java.util.*;
  */
 public class TupleDesc implements Serializable {
 
-    private List<TDItem> items = new ArrayList<>();
+    protected List<TDItem> items = new ArrayList<>();
 
     /**
      * A help class to facilitate organizing the information of each field
@@ -68,7 +68,7 @@ public class TupleDesc implements Serializable {
             throw new RuntimeException("type and field not match");
         }
         int len = fieldAr.length;
-        for (int i = 0; i < typeAr.length; ++i) {
+        for (int i = 0; i < len; ++i) {
             items.add(new TDItem(typeAr[i], fieldAr[i]));
         }
     }
@@ -85,6 +85,14 @@ public class TupleDesc implements Serializable {
         // wildpea
         for (Type type : typeAr) {
             items.add(new TDItem(type, ""));
+        }
+    }
+
+    public TupleDesc(TupleDesc td) {
+        // wildpea
+        int len = td.numFields();
+        for (int i = 0; i < len; ++i) {
+            items.add(new TDItem(td.getFieldType(i), td.getFieldName(i)));
         }
     }
 

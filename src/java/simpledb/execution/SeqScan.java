@@ -1,6 +1,7 @@
 package simpledb.execution;
 
 import simpledb.common.Database;
+import simpledb.storage.DbFile;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 import simpledb.common.Type;
@@ -20,6 +21,32 @@ public class SeqScan implements OpIterator {
 
     private static final long serialVersionUID = 1L;
 
+    // wildpea
+    class ScanTupleDesc extends TupleDesc {
+        ScanTupleDesc(TupleDesc std) {
+            super(std);
+        }
+        @Override
+        public String getFieldName(int i) throws NoSuchElementException {
+            if (items.size() > i) {
+                String fieldName = items.get(i).fieldName;
+                if (tableAlias != null && !"".equals(tableAlias)) {
+                    fieldName = tableAlias + "." + fieldName;
+                }
+                return fieldName;
+            }
+            throw new NoSuchElementException("no such element");
+        }
+    }
+
+    private TransactionId tid;
+    private int tableid;
+    private String tableAlias;
+    private DbFile df;
+    private DbFileIterator iter;
+    private ScanTupleDesc scanTupleDesc;
+
+
     /**
      * Creates a sequential scan over the specified table as a part of the
      * specified transaction.
@@ -37,7 +64,9 @@ public class SeqScan implements OpIterator {
      *            tableAlias.null, or null.null).
      */
     public SeqScan(TransactionId tid, int tableid, String tableAlias) {
-        // some code goes here
+        // wildpea
+        this.tid = tid;
+        reset(tableid, tableAlias);
     }
 
     /**
@@ -54,8 +83,8 @@ public class SeqScan implements OpIterator {
      * */
     public String getAlias()
     {
-        // some code goes here
-        return null;
+        // wildpea
+        return tableAlias;
     }
 
     /**
@@ -71,15 +100,23 @@ public class SeqScan implements OpIterator {
      *            tableAlias.null, or null.null).
      */
     public void reset(int tableid, String tableAlias) {
-        // some code goes here
+        // wildpea
+        this.tableid = tableid;
+        this.tableAlias = tableAlias;
+
+        df = Database.getCatalog().getDatabaseFile(this.tableid);
+        scanTupleDesc = new ScanTupleDesc(this.df.getTupleDesc());
     }
 
     public SeqScan(TransactionId tid, int tableId) {
         this(tid, tableId, Database.getCatalog().getTableName(tableId));
     }
 
+    @Override
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        this.iter = this.df.iterator(tid);
+        iter.open();
     }
 
     /**
@@ -92,28 +129,35 @@ public class SeqScan implements OpIterator {
      * @return the TupleDesc with field names from the underlying HeapFile,
      *         prefixed with the tableAlias string from the constructor.
      */
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        // wildpea
+        return scanTupleDesc;
     }
 
+    @Override
     public boolean hasNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return false;
+        // wildpea
+        return iter.hasNext();
     }
 
+    @Override
     public Tuple next() throws NoSuchElementException,
             TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        // wildpea
+        return iter.next();
     }
 
+    @Override
     public void close() {
-        // some code goes here
+        // wildpea
+        iter.close();
     }
 
+    @Override
     public void rewind() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        iter.rewind();
     }
 }

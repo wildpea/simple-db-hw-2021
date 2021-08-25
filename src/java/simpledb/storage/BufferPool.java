@@ -9,6 +9,8 @@ import simpledb.transaction.TransactionId;
 
 import java.io.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,7 +29,8 @@ public class BufferPool {
     private static final int DEFAULT_PAGE_SIZE = 4096;
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
-    private static int numPages;
+    private static int maxNumPages;
+    private Map<PageId, Page> pages = new HashMap<>();
     
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
@@ -41,7 +44,7 @@ public class BufferPool {
      */
     public BufferPool(int numPages) {
         // wildpea
-        this.numPages = numPages;
+        maxNumPages = numPages;
     }
     
     public static int getPageSize() {
@@ -76,7 +79,23 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // wildpea
-        return null;
+//        if (perm.equals(Permissions.READ_WRITE)) {
+//
+//        }
+
+        if (pages.containsKey(pid)) {
+            return pages.get(pid);
+        }
+
+        DbFile df = Database.getCatalog().getDatabaseFile(pid.getTableId());
+        Page page = df.readPage(pid);
+
+        if (pages.size() >= maxNumPages) {
+            evictPage();
+        }
+        pages.put(pid, page);
+
+        return page;
     }
 
     /**
