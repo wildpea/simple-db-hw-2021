@@ -88,7 +88,7 @@ public class TupleDesc implements Serializable {
         }
     }
 
-    public TupleDesc(TupleDesc td) {
+    protected TupleDesc(TupleDesc td) {
         // wildpea
         int len = td.numFields();
         for (int i = 0; i < len; ++i) {

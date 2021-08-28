@@ -1,11 +1,18 @@
 package simpledb.execution;
 
 import simpledb.common.DbException;
+import simpledb.common.Type;
+import simpledb.storage.Field;
+import simpledb.storage.IntField;
 import simpledb.storage.Tuple;
 import simpledb.storage.TupleDesc;
 import simpledb.transaction.TransactionAbortedException;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
+
+import static simpledb.execution.Aggregator.NO_GROUPING;
 
 
 /**
@@ -16,6 +23,13 @@ import java.util.NoSuchElementException;
 public class Aggregate extends Operator {
 
     private static final long serialVersionUID = 1L;
+
+    private OpIterator child;
+    private int afield;
+    private int gfield;
+    private Aggregator.Op aop;
+
+    private TupleDesc td;
 
     /**
      * Constructor.
@@ -31,7 +45,13 @@ public class Aggregate extends Operator {
      * @param aop    The aggregation operator to use
      */
     public Aggregate(OpIterator child, int afield, int gfield, Aggregator.Op aop) {
-        // some code goes here
+        // wildpea
+        this.child = child;
+        this.afield = afield;
+        this.gfield = gfield;
+        this.aop = aop;
+
+        td = child.getTupleDesc();
     }
 
     /**
@@ -40,8 +60,8 @@ public class Aggregate extends Operator {
      * {@link Aggregator#NO_GROUPING}
      */
     public int groupField() {
-        // some code goes here
-        return -1;
+        // wildpea
+        return gfield;
     }
 
     /**
@@ -50,16 +70,16 @@ public class Aggregate extends Operator {
      * null;
      */
     public String groupFieldName() {
-        // some code goes here
-        return null;
+        // wildpea
+        return child.getTupleDesc().getFieldName(gfield);
     }
 
     /**
      * @return the aggregate field
      */
     public int aggregateField() {
-        // some code goes here
-        return -1;
+        // wildpea
+        return afield;
     }
 
     /**
@@ -67,25 +87,28 @@ public class Aggregate extends Operator {
      * tuples
      */
     public String aggregateFieldName() {
-        // some code goes here
-        return null;
+        // wildpea
+        return child.getTupleDesc().getFieldName(afield);
     }
 
     /**
      * @return return the aggregate operator
      */
     public Aggregator.Op aggregateOp() {
-        // some code goes here
-        return null;
+        // wildpea
+        return aop;
     }
 
     public static String nameOfAggregatorOp(Aggregator.Op aop) {
         return aop.toString();
     }
 
+    @Override
     public void open() throws NoSuchElementException, DbException,
             TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child.open();
+        super.open();
     }
 
     /**
@@ -95,13 +118,19 @@ public class Aggregate extends Operator {
      * the result tuple should contain one field representing the result of the
      * aggregate. Should return null if there are no more tuples.
      */
+    @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
+        // wildpea
+        if (child.hasNext()) {
+            return child.next();
+        }
         return null;
     }
 
+    @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child.rewind();
     }
 
     /**
@@ -115,24 +144,32 @@ public class Aggregate extends Operator {
      * given in the constructor, and child_td is the TupleDesc of the child
      * iterator.
      */
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        // wildpea
+        return td;
     }
 
+    @Override
     public void close() {
-        // some code goes here
+        // wildpea
+        child.close();
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        // wildpea
+        return new OpIterator[]{ child };
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        // wildpea
+        if (children.length > 0) {
+            child = children[0];
+        } else {
+            child = null;
+        }
     }
 
 }

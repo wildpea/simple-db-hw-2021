@@ -1,5 +1,6 @@
 package simpledb.execution;
 
+import simpledb.storage.Field;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.common.DbException;
 import simpledb.storage.Tuple;
@@ -14,6 +15,14 @@ public class Join extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    private JoinPredicate p;
+    private OpIterator child1;
+    private OpIterator child2;
+
+    private TupleDesc td;
+
+    private Tuple t1;
+
     /**
      * Constructor. Accepts two children to join and the predicate to join them
      * on
@@ -26,12 +35,16 @@ public class Join extends Operator {
      *            Iterator for the right(inner) relation to join
      */
     public Join(JoinPredicate p, OpIterator child1, OpIterator child2) {
-        // some code goes here
+        // wildpea
+        this.p = p;
+        this.child1 = child1;
+        this.child2 = child2;
+        this.td = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
     public JoinPredicate getJoinPredicate() {
-        // some code goes here
-        return null;
+        // wildpea
+        return p;
     }
 
     /**
@@ -40,8 +53,8 @@ public class Join extends Operator {
      *       alias or table name.
      * */
     public String getJoinField1Name() {
-        // some code goes here
-        return null;
+        // wildpea
+        return child1.getTupleDesc().getFieldName(p.getField1());
     }
 
     /**
@@ -50,30 +63,42 @@ public class Join extends Operator {
      *       alias or table name.
      * */
     public String getJoinField2Name() {
-        // some code goes here
-        return null;
+        // wildpea
+        return child2.getTupleDesc().getFieldName(p.getField2());
     }
 
     /**
      * @see TupleDesc#merge(TupleDesc, TupleDesc) for possible
      *      implementation logic.
      */
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        // wildpea
+        return td;
     }
 
+    @Override
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child1.open();
+        child2.open();
+        super.open();
     }
 
+    @Override
     public void close() {
-        // some code goes here
+        // wildpea
+        child1.close();
+        child2.close();
     }
 
+    @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child1.rewind();
+        child2.rewind();
+        t1 = null;
     }
 
     /**
@@ -94,20 +119,57 @@ public class Join extends Operator {
      * @return The next matching tuple.
      * @see JoinPredicate#filter
      */
+    @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
+        // wildpea
+        while (t1 != null || (t1 = findNextT1()) != null) {
+            while (child2.hasNext()) {
+                Tuple t2 = child2.next();
+                if (t1.getField(p.getField1()).compare(p.getOperator(), t2.getField(p.getField2()))) {
+                    return mergeTuple(t1, t2);
+                }
+            }
+            child2.rewind();
+            t1 = findNextT1();
+        }
         return null;
+    }
+
+    private Tuple mergeTuple(Tuple t1, Tuple t2) {
+        Tuple rt = new Tuple(td);
+        int len1 = t1.getTupleDesc().numFields();
+        for (int i = 0; i < len1; ++i) {
+            rt.setField(i, t1.getField(i));
+        }
+        for (int i = 0; i < t2.getTupleDesc().numFields(); ++i) {
+            rt.setField(i + len1, t2.getField(i));
+        }
+        return rt;
+    }
+
+    private Tuple findNextT1() throws TransactionAbortedException, DbException {
+        if (child1.hasNext()) {
+            return child1.next();
+        } else {
+            return null;
+        }
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        // wildpea
+        return new OpIterator[] { child1, child2 };
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        // wildpea
+        if (children.length >= 1) {
+            child1 = children[0];
+        }
+        if (children.length >= 2) {
+            child2 = children[1];
+        }
     }
 
 }

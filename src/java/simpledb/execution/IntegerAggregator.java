@@ -1,7 +1,12 @@
 package simpledb.execution;
 
 import simpledb.common.Type;
-import simpledb.storage.Tuple;
+import simpledb.storage.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
@@ -9,6 +14,18 @@ import simpledb.storage.Tuple;
 public class IntegerAggregator implements Aggregator {
 
     private static final long serialVersionUID = 1L;
+
+    private int gbfield;
+    private Type gbfieldtype;
+    private int afield;
+    private Op what;
+
+    private TupleDesc td;
+    private boolean groupBy;
+    private int filedIndex;
+    private Map<Field, Tuple> tuples = new HashMap<>();
+    private IntField defaultField = new IntField(0);
+    private Map<Field, Double[]> mAvg = new HashMap<>();
 
     /**
      * Aggregate constructor
@@ -26,7 +43,72 @@ public class IntegerAggregator implements Aggregator {
      */
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        // some code goes here
+        // wildpea
+        this.gbfield = gbfield;
+        this.gbfieldtype = gbfieldtype;
+        this.afield = afield;
+        this.what = what;
+        this.groupBy = gbfield != NO_GROUPING;
+
+        this.filedIndex = gbfield == -1 ? 0 : 1;
+        Type[] typeAr = new Type[filedIndex + 1];
+        if (groupBy) {
+            typeAr[0]  = gbfieldtype;
+        }
+        typeAr[filedIndex] = Type.INT_TYPE;
+
+        td = new TupleDesc(typeAr);
+    }
+
+    private IntField getRst(Field key, IntField f1, IntField f2) {
+        switch (what) {
+            case MIN:
+                if (f1 == null) {
+                    return new IntField(f2.getValue());
+                }
+                return new IntField(Math.min(f1.getValue(), f2.getValue()));
+            case MAX:
+                if (f1 == null) {
+                    return new IntField(f2.getValue());
+                }
+                return new IntField(Math.max(f1.getValue(), f2.getValue()));
+            case SUM:
+                if (f1 == null) {
+                    return new IntField(f2.getValue());
+                }
+                return new IntField(f1.getValue() + f2.getValue());
+            case AVG:
+                Double[] m = mAvg.get(key);
+                if (f1 == null) {
+                    m[0] = 1.0;
+                    m[1] = (double) f2.getValue();
+                    return new IntField(f2.getValue());
+                }
+                m[0] = m[1] + 1;
+                m[1] = f1.getValue() + (f2.getValue() - f1.getValue()) / m[0];
+                return new IntField((int)Math.round(m[1]));
+            case COUNT:
+                if (f1 == null) {
+                    return new IntField(1);
+                }
+                return new IntField(f1.getValue() + 1);
+            case SUM_COUNT:
+            case SC_AVG:
+            default:
+                return defaultField;
+        }
+    }
+
+    private void initTuple(Field key) {
+        Tuple t = new Tuple(td);
+        if (groupBy) {
+            t.setField(0, key);
+        }
+        tuples.put(key, t);
+
+        if (Aggregator.Op.AVG.equals(what)) {
+            mAvg.put(key, new Double[]{0.0, 0.0});
+        }
     }
 
     /**
@@ -36,8 +118,16 @@ public class IntegerAggregator implements Aggregator {
      * @param tup
      *            the Tuple containing an aggregate field and a group-by field
      */
+    @Override
     public void mergeTupleIntoGroup(Tuple tup) {
-        // some code goes here
+        // wildpea
+        Field key = !groupBy ? defaultField : tup.getField(gbfield);
+        if (!tuples.containsKey(key)) {
+            initTuple(key);
+        }
+
+        Tuple t = tuples.get(key);
+        t.setField(filedIndex, getRst(key, (IntField) t.getField(filedIndex), (IntField) tup.getField(afield)));
     }
 
     /**
@@ -48,10 +138,10 @@ public class IntegerAggregator implements Aggregator {
      *         aggregateVal is determined by the type of aggregate specified in
      *         the constructor.
      */
+    @Override
     public OpIterator iterator() {
-        // some code goes here
-        throw new
-        UnsupportedOperationException("please implement me for lab2");
+        // wildpea
+        return new Aggregate(new TupleIterator(td, tuples.values()), gbfield, afield, what);
     }
 
 }
