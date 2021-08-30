@@ -97,7 +97,7 @@ public class StringAggregator implements Aggregator {
     @Override
     public OpIterator iterator() {
         // wildpea
-        return new Aggregate(new TupleIterator(td, tuples.values()), gbfield, afield, what);
+        return new TupleIterator(td, tuples.values());
     }
 
 }

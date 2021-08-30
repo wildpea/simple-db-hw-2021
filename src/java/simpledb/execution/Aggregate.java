@@ -25,9 +25,11 @@ public class Aggregate extends Operator {
     private static final long serialVersionUID = 1L;
 
     private OpIterator child;
+    private OpIterator iter;
     private int afield;
     private int gfield;
     private Aggregator.Op aop;
+    private Aggregator agg;
 
     private TupleDesc td;
 
@@ -51,7 +53,14 @@ public class Aggregate extends Operator {
         this.gfield = gfield;
         this.aop = aop;
 
-        td = child.getTupleDesc();
+        Type type = child.getTupleDesc().getFieldType(afield);
+        Type gType = gfield != NO_GROUPING ? child.getTupleDesc().getFieldType(gfield) : null;
+        if (Type.INT_TYPE.equals(type)) {
+            agg = new IntegerAggregator(gfield, gType, afield, aop);
+        } else if (Type.STRING_TYPE.equals(type)) {
+            agg = new StringAggregator(gfield, gType, afield, aop);
+        }
+        td = agg.iterator().getTupleDesc();
     }
 
     /**
@@ -108,6 +117,11 @@ public class Aggregate extends Operator {
             TransactionAbortedException {
         // wildpea
         child.open();
+        while (child.hasNext()) {
+            agg.mergeTupleIntoGroup(child.next());
+        }
+        iter = agg.iterator();
+        iter.open();
         super.open();
     }
 
@@ -121,8 +135,8 @@ public class Aggregate extends Operator {
     @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // wildpea
-        if (child.hasNext()) {
-            return child.next();
+        if (iter.hasNext()) {
+            return iter.next();
         }
         return null;
     }
@@ -131,6 +145,7 @@ public class Aggregate extends Operator {
     public void rewind() throws DbException, TransactionAbortedException {
         // wildpea
         child.rewind();
+        iter.rewind();
     }
 
     /**
@@ -154,6 +169,7 @@ public class Aggregate extends Operator {
     public void close() {
         // wildpea
         child.close();
+        iter.close();
     }
 
     @Override

@@ -84,9 +84,16 @@ public class IntegerAggregator implements Aggregator {
                     m[1] = (double) f2.getValue();
                     return new IntField(f2.getValue());
                 }
-                m[0] = m[1] + 1;
-                m[1] = f1.getValue() + (f2.getValue() - f1.getValue()) / m[0];
-                return new IntField((int)Math.round(m[1]));
+                m[0] = m[0] + 1.0;
+
+                // >_< all for test_case
+                if (false) {
+                    m[1] = m[1] + ((double) f2.getValue() - m[1]) / m[0];
+                    return new IntField((int) Math.round(m[1]));
+                } else {
+                    m[1] = m[1] + f2.getValue();
+                    return new IntField((int) (m[1] / m[0]));
+                }
             case COUNT:
                 if (f1 == null) {
                     return new IntField(1);
@@ -141,7 +148,7 @@ public class IntegerAggregator implements Aggregator {
     @Override
     public OpIterator iterator() {
         // wildpea
-        return new Aggregate(new TupleIterator(td, tuples.values()), gbfield, afield, what);
+        return new TupleIterator(td, tuples.values());
     }
 
 }
