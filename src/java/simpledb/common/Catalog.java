@@ -34,8 +34,8 @@ public class Catalog {
         }
     }
 
-    private Map<String, Table> tables = new HashMap<>();
-    private Map<Integer, String> tbMaps = new HashMap<>();
+    private Map<String, Table> tables = new HashMap<>();        //name, table
+    private Map<Integer, String> tbMaps = new HashMap<>();      //tableid, name
 
     /**
      * Constructor.

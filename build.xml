@@ -239,6 +239,37 @@
         </RunJunit>
     </target>
 
+    <target name="mytest" depends="testcompile" description="Run all system tests">
+        <RunJunit>
+            <batchtest>
+                <fileset dir="${build.test}">
+                    <include name="simpledb/TupleDescTest.class"/>
+                    <include name="simpledb/TupleTest.class"/>
+                    <include name="simpledb/CatalogTest.class"/>
+                    <include name="simpledb/BufferPoolTest.class"/>
+                    <include name="simpledb/HeapPageIdTest.class"/>
+                    <include name="simpledb/RecordIDTest.class"/>
+                    <include name="simpledb/HeapPageReadTest.class"/>
+                    <include name="simpledb/HeapFileReadTest.class"/>
+                    <include name="simpledb/ScanTest.class"/>
+                    <include name="simpledb/Lab1Test.class"/>
+
+                    <include name="simpledb/PredicateTest.class"/>
+                    <include name="simpledb/JoinPredicateTest.class"/>
+                    <include name="simpledb/FilterTest.class"/>
+                    <include name="simpledb/JoinTest.class"/>
+                    <include name="simpledb/IntegerAggregatorTest.class"/>
+                    <include name="simpledb/StringAggregatorTest.class"/>
+                    <include name="simpledb/AggregateTest.class"/>
+                    <include name="simpledb/systemtest/AggregateTest.class"/>
+                    <include name="simpledb/HeapPageWriteTest.class"/>
+<!--                    <include name="simpledb/HeapFileWriteTest.class"/>-->
+<!--                    <include name="simpledb/BufferPoolWriteTest.class"/>-->
+                </fileset>
+            </batchtest>
+        </RunJunit>
+    </target>
+
     <target name="runtest" depends="testcompile"
             description="Runs the test you specify on the command line with -Dtest=">
         <!-- Check for -Dtest command line argument -->

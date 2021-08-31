@@ -7,11 +7,13 @@ import simpledb.common.DeadlockException;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -31,6 +33,7 @@ public class BufferPool {
     private static int pageSize = DEFAULT_PAGE_SIZE;
     private static int maxNumPages;
     private Map<PageId, Page> pages = new HashMap<>();
+    private Map<PageId, ReentrantLock> locks = new HashMap<>();
     
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
@@ -80,7 +83,7 @@ public class BufferPool {
         throws TransactionAbortedException, DbException {
         // wildpea
 //        if (perm.equals(Permissions.READ_WRITE)) {
-//
+//            lock(pid);
 //        }
 
         if (pages.containsKey(pid)) {
@@ -88,12 +91,13 @@ public class BufferPool {
         }
 
         DbFile df = Database.getCatalog().getDatabaseFile(pid.getTableId());
-        Page page = df.readPage(pid);
 
+        Page page = df.readPage(pid);
         if (pages.size() >= maxNumPages) {
             evictPage();
         }
         pages.put(pid, page);
+        locks.put(pid, new ReentrantLock());
 
         return page;
     }
@@ -158,8 +162,10 @@ public class BufferPool {
      */
     public void insertTuple(TransactionId tid, int tableId, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
+        Page p = getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+//        p.in
     }
 
     /**
@@ -177,7 +183,7 @@ public class BufferPool {
      */
     public  void deleteTuple(TransactionId tid, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
     }
 
@@ -187,7 +193,7 @@ public class BufferPool {
      *     break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
 
     }
@@ -201,7 +207,7 @@ public class BufferPool {
         are removed from the cache so they can be reused safely
     */
     public synchronized void discardPage(PageId pid) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
     }
 
@@ -210,7 +216,7 @@ public class BufferPool {
      * @param pid an ID indicating the page to flush
      */
     private synchronized  void flushPage(PageId pid) throws IOException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
     }
 
@@ -226,7 +232,7 @@ public class BufferPool {
      * Flushes the page to disk to ensure dirty pages are updated on disk.
      */
     private synchronized  void evictPage() throws DbException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
     }
 

@@ -28,6 +28,8 @@ public class HeapPage implements Page {
 
     byte[] oldData;
     private final Byte oldDataLock= (byte) 0;
+    private boolean dirty;
+    private TransactionId dirtyTid;
 
     /**
      * Create a HeapPage from a set of bytes of data read from disk.
@@ -49,6 +51,7 @@ public class HeapPage implements Page {
         this.pid = id;
         this.td = Database.getCatalog().getTupleDesc(id.getTableId());
         this.numSlots = getNumTuples();
+
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(data));
 
         // allocate and read the header slots of this page
@@ -90,6 +93,7 @@ public class HeapPage implements Page {
     
     /** Return a view of this page before it was modified
         -- used by recovery */
+    @Override
     public HeapPage getBeforeImage(){
         try {
             byte[] oldDataRef = null;
@@ -105,7 +109,8 @@ public class HeapPage implements Page {
         }
         return null;
     }
-    
+
+    @Override
     public void setBeforeImage() {
         synchronized(oldDataLock) {
             oldData = getPageData().clone();
@@ -167,6 +172,7 @@ public class HeapPage implements Page {
      * @see #HeapPage
      * @return A byte array correspond to the bytes of this page.
      */
+    @Override
     public byte[] getPageData() {
         int len = BufferPool.getPageSize();
         ByteArrayOutputStream baos = new ByteArrayOutputStream(len);
@@ -250,8 +256,18 @@ public class HeapPage implements Page {
      * @param t The tuple to delete
      */
     public void deleteTuple(Tuple t) throws DbException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
+        RecordId rid = t.getRecordId();
+        int tupleNo = rid.getTupleNumber();
+        if (!rid.getPageId().equals(this.pid)
+                || !isSlotUsed(tupleNo)
+                || !tuples[tupleNo].equals(t)) {
+            throw new DbException("slot is already empty!");
+        }
+
+        tuples[tupleNo] = null;
+        markSlotUsed(tupleNo, false);
     }
 
     /**
@@ -262,26 +278,48 @@ public class HeapPage implements Page {
      * @param t The tuple to add.
      */
     public void insertTuple(Tuple t) throws DbException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
+        if (!t.getTupleDesc().equals(td)) {
+            throw new DbException("tupleDesc not match");
+        }
+        if (getNumEmptySlots() == 0) {
+            throw new DbException("no space");
+        }
+        for (int i = 0; i < tuples.length; i++) {
+            if (tuples[i] == null && !isSlotUsed(i)) {
+                t.setRecordId(new RecordId(pid, i));
+                markSlotUsed(i, true);
+                tuples[i] = t;
+                //markDirty(true, t.);
+                return;
+            }
+        }
+        if (getNumEmptySlots() == 0) {
+            throw new DbException("no space");
+        }
     }
 
     /**
      * Marks this page as dirty/not dirty and record that transaction
      * that did the dirtying
      */
+    @Override
     public void markDirty(boolean dirty, TransactionId tid) {
-        // some code goes here
-	// not necessary for lab1
+        // wildpea
+	    // not necessary for lab1
+        this.dirty = dirty;
+        this.dirtyTid = dirty ? tid : null;
     }
 
     /**
      * Returns the tid of the transaction that last dirtied this page, or null if the page is not dirty
      */
+    @Override
     public TransactionId isDirty() {
-        // some code goes here
-	// Not necessary for lab1
-        return null;      
+        // wildpea
+	    // Not necessary for lab1
+        return dirtyTid;
     }
 
     /**
@@ -322,8 +360,18 @@ public class HeapPage implements Page {
      * Abstraction to fill or clear a slot on this page.
      */
     private void markSlotUsed(int i, boolean value) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1
+        if (i > numSlots) {
+            return;
+        }
+        //byte b = header[i / 8];
+        byte x = (byte) (0x1 << (i % 8));
+        if (value) {
+            header[i / 8] |= x;
+        } else {
+            header[i / 8] &= (0xFF ^ x);
+        }
     }
 
     /**
