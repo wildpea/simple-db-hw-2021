@@ -134,6 +134,9 @@ public class ScanTest extends SimpleDbTestBase {
         for (int i = 0; i < original.numFields(); i++) {
            assertEquals(prefix + "." + original.getFieldName(i), prefixed.getFieldName(i));
         }
+        for (int i = 0; i < original.numFields(); i++) {
+            assertEquals(original.fieldNameToIndex("test"+i), prefixed.fieldNameToIndex(prefix + ".test"+i));
+        }
     }
 
     /** Make test compatible with older version of ant. */

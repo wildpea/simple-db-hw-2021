@@ -261,8 +261,8 @@ public class HeapPage implements Page {
         RecordId rid = t.getRecordId();
         int tupleNo = rid.getTupleNumber();
         if (!rid.getPageId().equals(this.pid)
-                || !isSlotUsed(tupleNo)
-                || !tuples[tupleNo].equals(t)) {
+                || !isSlotUsed(tupleNo)) {
+//                || !tuples[tupleNo].equals(t)) {
             throw new DbException("slot is already empty!");
         }
 

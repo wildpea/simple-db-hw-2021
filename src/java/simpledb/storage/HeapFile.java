@@ -13,6 +13,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
+import static sun.swing.MenuItemLayoutHelper.max;
+
 /**
  * HeapFile is an implementation of a DbFile that stores a collection of tuples
  * in no particular order. Tuples are stored on pages, each of which is a fixed
@@ -27,8 +29,7 @@ public class HeapFile implements DbFile {
 
     private File f;
     private TupleDesc td;
-    private int maxPgNo = 0;   //相当于len，pageNo 从0~maxPgNo-1
-    private Map<Integer, HeapPage> newPages = new HashMap<>();
+    private Map<Integer, Page> newPages = new HashMap<>();
 
     /**
      * Constructs a heap file backed by the specified file.
@@ -41,7 +42,6 @@ public class HeapFile implements DbFile {
         // wildpea
         this.f = f;
         this.td = td;
-        maxPgNo = (int) (f.length() / BufferPool.getPageSize());
     }
 
     /**
@@ -84,7 +84,7 @@ public class HeapFile implements DbFile {
     @Override
     public Page readPage(PageId pid) {
         // wildpea
-        if (pid.getTableId() != getId() || pid.getPageNumber() >= maxPgNo) {
+        if (pid.getTableId() != getId() || pid.getPageNumber() >= numPages()) {
             throw new IllegalArgumentException("not current tableId");
         }
 
@@ -114,12 +114,11 @@ public class HeapFile implements DbFile {
         // wildpea
         // not necessary for lab1
         try (RandomAccessFile randomAccessFile = new RandomAccessFile(f, "rw")) {
-            randomAccessFile.seek(getFileOffset(page.getId().getPageNumber()));
+            int pgNo = page.getId().getPageNumber();
+            randomAccessFile.seek(getFileOffset(pgNo));
             randomAccessFile.write(page.getPageData());
 
-            if (page.getId().getPageNumber() + 1 >= maxPgNo) {
-                maxPgNo = page.getId().getPageNumber() + 1;
-            }
+            newPages.remove(pgNo);
         } catch (Exception e) {
             throw new IOException("write page error");
         }
@@ -130,7 +129,7 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // wildpea
-        return maxPgNo;
+        return (int) (f.length() / BufferPool.getPageSize()) + newPages.size();
     }
 
     // see DbFile.java for javadocs
@@ -140,15 +139,14 @@ public class HeapFile implements DbFile {
         // wildpea
         // not necessary for lab1
         ArrayList<Page> pgs = new ArrayList<>();
-        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), maxPgNo - 1), Permissions.READ_WRITE);
+        HeapPage page;
         try {
+            page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), Math.max(0, numPages() - 1)), Permissions.READ_WRITE);
             page.insertTuple(t);
-        } catch (DbException e) {
-            page = new HeapPage(new HeapPageId(getId(), maxPgNo), HeapPage.createEmptyPageData());
+        } catch (Exception e) {
+            page = new HeapPage(new HeapPageId(getId(), numPages()), HeapPage.createEmptyPageData());
             page.insertTuple(t);
-
-            newPages.put(maxPgNo, page);
-            maxPgNo++;
+            newPages.put(numPages(), page);
         }
         pgs.add(page);
         return pgs;
@@ -195,7 +193,7 @@ public class HeapFile implements DbFile {
                         return false;
                     }
                     if (iter == null) {
-                        if (curPgNo >= maxPgNo) {
+                        if (curPgNo >= numPages()) {
                             return false;
                         }
 
@@ -207,7 +205,7 @@ public class HeapFile implements DbFile {
                         return true;
                     }
 
-                    while (++curPgNo < maxPgNo) {
+                    while (++curPgNo < numPages()) {
                         curPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), curPgNo), perm);
                         iter = curPage.iterator();
                         if (iter.hasNext()) {

@@ -1,12 +1,7 @@
 package simpledb.execution;
 
-import simpledb.common.Database;
-import simpledb.common.DbException;
-import simpledb.common.Type;
-import simpledb.storage.BufferPool;
-import simpledb.storage.IntField;
-import simpledb.storage.Tuple;
-import simpledb.storage.TupleDesc;
+import simpledb.common.*;
+import simpledb.storage.*;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -20,6 +15,11 @@ public class Delete extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    private TransactionId t;
+    private OpIterator child;
+    private TupleDesc td;
+    private boolean called = false;
+
     /**
      * Constructor specifying the transaction that this delete belongs to as
      * well as the child to read from.
@@ -30,24 +30,37 @@ public class Delete extends Operator {
      *            The child operator from which to read tuples for deletion
      */
     public Delete(TransactionId t, OpIterator child) {
-        // some code goes here
+        // wildpea
+        this.t = t;
+        this.child = child;
+        this.td = Utility.getTupleDesc(1);
     }
 
+    @Override
     public TupleDesc getTupleDesc() {
-        // some code goes here
+        // wildpea
         return null;
     }
 
+    @Override
     public void open() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child.open();
+        called = false;
+        super.open();
     }
 
+    @Override
     public void close() {
-        // some code goes here
+        // wildpea
+        child.close();
     }
 
+    @Override
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        // wildpea
+        child.rewind();
+        called = false;
     }
 
     /**
@@ -59,20 +72,43 @@ public class Delete extends Operator {
      * @see Database#getBufferPool
      * @see BufferPool#deleteTuple
      */
+    @Override
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
-        // some code goes here
-        return null;
+        // wildpea
+        if (called) {
+            return null;
+        }
+        called = true;
+
+        int num = 0;
+        try {
+            while (child.hasNext()) {
+                Database.getBufferPool().deleteTuple(t, child.next());
+                ++num;
+            }
+        } catch (Exception e) {
+            throw new DbException("delete err");
+        }
+
+        Tuple rst = new Tuple(td);
+        rst.setField(0, new IntField(num));
+        return rst;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        // wildpea
+        return new OpIterator[] { child };
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        // wildpea
+        if (children.length > 0) {
+            child = children[0];
+        } else {
+            child = null;
+        }
     }
 
 }

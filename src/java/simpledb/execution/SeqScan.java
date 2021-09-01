@@ -28,14 +28,12 @@ public class SeqScan implements OpIterator {
         }
         @Override
         public String getFieldName(int i) throws NoSuchElementException {
-            if (items.size() > i) {
-                String fieldName = items.get(i).fieldName;
-                if (tableAlias != null && !"".equals(tableAlias)) {
-                    fieldName = tableAlias + "." + fieldName;
-                }
-                return fieldName;
-            }
-            throw new NoSuchElementException("no such element");
+            return tableAlias + "." + super.getFieldName(i);
+        }
+        @Override
+        public int fieldNameToIndex(String name) throws NoSuchElementException {
+            // wildpea
+            return super.fieldNameToIndex(name.substring(tableAlias.length() + 1));
         }
     }
 
@@ -75,7 +73,7 @@ public class SeqScan implements OpIterator {
      *       be the actual name of the table in the catalog of the database
      * */
     public String getTableName() {
-        return null;
+        return Database.getCatalog().getTableName(tableid);
     }
 
     /**
@@ -102,7 +100,7 @@ public class SeqScan implements OpIterator {
     public void reset(int tableid, String tableAlias) {
         // wildpea
         this.tableid = tableid;
-        this.tableAlias = tableAlias;
+        this.tableAlias = tableAlias == null ? getTableName() : tableAlias;
 
         df = Database.getCatalog().getDatabaseFile(this.tableid);
         scanTupleDesc = new ScanTupleDesc(this.df.getTupleDesc());

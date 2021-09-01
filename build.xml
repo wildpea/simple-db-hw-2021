@@ -251,7 +251,7 @@
                     <include name="simpledb/RecordIDTest.class"/>
                     <include name="simpledb/HeapPageReadTest.class"/>
                     <include name="simpledb/HeapFileReadTest.class"/>
-                    <include name="simpledb/ScanTest.class"/>
+                    <include name="simpledb/systemtest/ScanTest.class"/>
                     <include name="simpledb/Lab1Test.class"/>
 
                     <include name="simpledb/PredicateTest.class"/>
@@ -264,7 +264,12 @@
                     <include name="simpledb/systemtest/AggregateTest.class"/>
                     <include name="simpledb/HeapPageWriteTest.class"/>
                     <include name="simpledb/HeapFileWriteTest.class"/>
-<!--                    <include name="simpledb/BufferPoolWriteTest.class"/>-->
+                    <include name="simpledb/BufferPoolWriteTest.class"/>
+                    <include name="simpledb/InsertTest.class"/>
+                    <include name="simpledb/systemtest/InsertTest.class"/>
+                    <include name="simpledb/systemtest/DeleteTest.class"/>
+                    <include name="simpledb/systemtest/EvictTest.class"/>
+<!--                    <include name="simpledb/Lab2Test.class"/>-->
                 </fileset>
             </batchtest>
         </RunJunit>

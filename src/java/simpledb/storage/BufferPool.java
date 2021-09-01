@@ -10,8 +10,7 @@ import simpledb.transaction.TransactionId;
 import javax.xml.crypto.Data;
 import java.io.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -32,8 +31,18 @@ public class BufferPool {
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
     private static int maxNumPages;
-    private Map<PageId, Page> pages = new HashMap<>();
-    private Map<PageId, ReentrantLock> locks = new HashMap<>();
+
+    class PageData {
+        Page page;
+        Date date;
+        ReentrantLock lock;
+        PageData(Page page, Date date, ReentrantLock lock) {
+            this.page = page;
+            this.date = date;
+            this.lock = lock;
+        }
+    }
+    private Map<PageId, PageData> pages = new HashMap<>();
     
     /** Default number of pages passed to the constructor. This is used by
     other classes. BufferPool should use the numPages argument to the
@@ -87,7 +96,9 @@ public class BufferPool {
 //        }
 
         if (pages.containsKey(pid)) {
-            return pages.get(pid);
+            PageData pageData = pages.get(pid);
+            pageData.date = new Date();
+            return pageData.page;
         }
 
         DbFile df = Database.getCatalog().getDatabaseFile(pid.getTableId());
@@ -96,8 +107,7 @@ public class BufferPool {
         if (pages.size() >= maxNumPages) {
             evictPage();
         }
-        pages.put(pid, page);
-        locks.put(pid, new ReentrantLock());
+        pages.put(pid, new PageData(page, new Date(), null));
 
         return page;
     }
@@ -164,8 +174,15 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // wildpea
         // not necessary for lab1
-        Page p = getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
-//        p.in
+        //DbFile file = getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
+        DbFile file = Database.getCatalog().getDatabaseFile(tableId);
+        List<Page> upPgs = file.insertTuple(tid, t);
+        for (Page page:upPgs) {
+            page.markDirty(true, tid);
+            if (!pages.containsKey(page.getId())) {
+                pages.put(page.getId(), new PageData(page, new Date(), null));
+            }
+        }
     }
 
     /**
@@ -181,10 +198,15 @@ public class BufferPool {
      * @param tid the transaction deleting the tuple.
      * @param t the tuple to delete
      */
-    public  void deleteTuple(TransactionId tid, Tuple t)
+    public void deleteTuple(TransactionId tid, Tuple t)
         throws DbException, IOException, TransactionAbortedException {
         // wildpea
         // not necessary for lab1
+        DbFile file = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
+        List<Page> upPgs = file.deleteTuple(tid, t);
+        for (Page page: upPgs) {
+            page.markDirty(true, tid);
+        }
     }
 
     /**
@@ -195,7 +217,13 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // wildpea
         // not necessary for lab1
-
+        for (Map.Entry<PageId, PageData> item: pages.entrySet()) {
+            Page page = item.getValue().page;
+            if (page.isDirty() != null) {
+                DbFile file = Database.getCatalog().getDatabaseFile(item.getKey().getTableId());
+                file.writePage(page);
+            }
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -209,6 +237,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // wildpea
         // not necessary for lab1
+        pages.remove(pid);
     }
 
     /**
@@ -218,6 +247,7 @@ public class BufferPool {
     private synchronized  void flushPage(PageId pid) throws IOException {
         // wildpea
         // not necessary for lab1
+        Database.getCatalog().getDatabaseFile(pid.getTableId()).writePage(pages.get(pid).page);
     }
 
     /** Write all pages of the specified transaction to disk.
@@ -234,6 +264,18 @@ public class BufferPool {
     private synchronized  void evictPage() throws DbException {
         // wildpea
         // not necessary for lab1
+        if (pages.size() == 0) {
+            return;
+        }
+        PageId pid = pages.values().stream().min(Comparator.comparing(v -> v.date)).get().page.getId();
+        if (pages.get(pid).page.isDirty() != null) {
+            try {
+                flushPage(pid);
+            } catch (IOException e) {
+                throw new DbException(e.getMessage());
+            }
+        }
+        pages.remove(pid);
     }
 
 }
