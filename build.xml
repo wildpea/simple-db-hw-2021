@@ -263,7 +263,7 @@
                     <include name="simpledb/AggregateTest.class"/>
                     <include name="simpledb/systemtest/AggregateTest.class"/>
                     <include name="simpledb/HeapPageWriteTest.class"/>
-<!--                    <include name="simpledb/HeapFileWriteTest.class"/>-->
+                    <include name="simpledb/HeapFileWriteTest.class"/>
 <!--                    <include name="simpledb/BufferPoolWriteTest.class"/>-->
                 </fileset>
             </batchtest>

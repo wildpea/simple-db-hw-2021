@@ -27,7 +27,7 @@ public class HeapFile implements DbFile {
 
     private File f;
     private TupleDesc td;
-    private int maxPgNo = 0;   //从1 开始
+    private int maxPgNo = 0;   //相当于len，pageNo 从0~maxPgNo-1
     private Map<Integer, HeapPage> newPages = new HashMap<>();
 
     /**
@@ -92,14 +92,13 @@ public class HeapFile implements DbFile {
             return newPages.get(pid.getPageNumber());
         }
 
-        try (FileInputStream is = new FileInputStream(f)) {
-            byte[] c = new byte[BufferPool.getPageSize()];
-            long startSize = getFileOffset(pid.getPageNumber());
-            if (startSize != is.skip(startSize) || is.read(c) == -1) {
+        try (RandomAccessFile randomAccessFile = new RandomAccessFile(f, "r")) {
+            randomAccessFile.seek(getFileOffset(pid.getPageNumber()));
+            byte[] b = new byte[BufferPool.getPageSize()];
+            if (randomAccessFile.read(b) == -1) {
                 throw new IllegalArgumentException("not current tableId");
             }
-            return new HeapPage((HeapPageId) pid, c);
-
+            return new HeapPage((HeapPageId) pid, b);
         } catch (Exception e) {
             throw new IllegalArgumentException("no such pgid");
         }
@@ -114,10 +113,9 @@ public class HeapFile implements DbFile {
     public void writePage(Page page) throws IOException {
         // wildpea
         // not necessary for lab1
-        try (FileOutputStream os = new FileOutputStream(f)) {
-            FileChannel ch = os.getChannel();
-            ch.position(getFileOffset(page.getId().getPageNumber()));
-            ch.write(ByteBuffer.wrap(page.getPageData()));
+        try (RandomAccessFile randomAccessFile = new RandomAccessFile(f, "rw")) {
+            randomAccessFile.seek(getFileOffset(page.getId().getPageNumber()));
+            randomAccessFile.write(page.getPageData());
 
             if (page.getId().getPageNumber() + 1 >= maxPgNo) {
                 maxPgNo = page.getId().getPageNumber() + 1;
@@ -233,7 +231,7 @@ public class HeapFile implements DbFile {
 
             @Override
             public void rewind() throws DbException, TransactionAbortedException {
-                curPgNo = 1;
+                curPgNo = 0;
                 curPage = null;
                 iter = null;
             }
