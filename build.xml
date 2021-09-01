@@ -270,6 +270,8 @@
                     <include name="simpledb/systemtest/DeleteTest.class"/>
                     <include name="simpledb/systemtest/EvictTest.class"/>
 <!--                    <include name="simpledb/Lab2Test.class"/>-->
+
+                    <include name="simpledb/IntHistogramTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>
