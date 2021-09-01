@@ -114,6 +114,10 @@ public class IntHistogram {
      */
     public double estimateSelectivity(Predicate.Op op, int v) {
     	// wildpea
+        if (ntups == 0) {
+            return -1.0;
+        }
+
         int index = getIndex(v);
         int h = buckets.get(index);
         switch (op) {
