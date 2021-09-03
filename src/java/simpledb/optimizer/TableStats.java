@@ -6,10 +6,9 @@ import simpledb.execution.Predicate;
 import simpledb.execution.SeqScan;
 import simpledb.storage.*;
 import simpledb.transaction.Transaction;
+import simpledb.transaction.TransactionId;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -68,6 +67,16 @@ public class TableStats {
      */
     static final int NUM_HIST_BINS = 100;
 
+    private int tableid;
+    private int ioCostPerPage;
+    private DbFile dbFile;
+    private TupleDesc td;
+    private int totalTups;
+
+    private Map<Integer, IntHistogram> intHistogramList = new HashMap<>();
+    private Map<Integer, StringHistogram> stringHistogramList = new HashMap<>();
+
+
     /**
      * Create a new TableStats object, that keeps track of statistics on each
      * column of a table
@@ -86,7 +95,60 @@ public class TableStats {
         // You should try to do this reasonably efficiently, but you don't
         // necessarily have to (for example) do everything
         // in a single scan of the table.
-        // some code goes here
+        // wildpea
+        this.tableid = tableid;
+        this.ioCostPerPage = ioCostPerPage;
+        this.dbFile = Database.getCatalog().getDatabaseFile(tableid);
+        this.td = dbFile.getTupleDesc();
+
+        Set<Integer> intFields = new HashSet<>();
+        Set<Integer> stringFields = new HashSet<>();
+        Map<Integer, Integer[]> intV = new HashMap<>();
+        for (int i = 0; i < td.numFields(); ++i) {
+            if (td.getFieldType(i).getClass() == Type.INT_TYPE.getClass()) {
+                intFields.add(i);
+                intV.put(i, new Integer[] { Integer.MAX_VALUE, Integer.MIN_VALUE });
+            } else {
+                stringFields.add(i);
+            }
+        }
+
+        totalTups = 0;
+        TransactionId tid = new TransactionId();
+        DbFileIterator iter = dbFile.iterator(tid);
+        try {
+            iter.open();
+            while (iter.hasNext()) {
+                Tuple t = iter.next();
+                for (Integer i: intFields) {
+                    int tf = ((IntField) t.getField(i)).getValue();
+                    intV.get(i)[0] = Math.min(tf, intV.get(i)[0]);
+                    intV.get(i)[1] = Math.max(tf, intV.get(i)[1]);
+                }
+                ++totalTups;
+            }
+
+            int buckets = Math.max(Math.min(totalTups / 20, 1000), 1);
+            for (Integer i : intFields) {
+                intHistogramList.put(i, new IntHistogram(buckets, intV.get(i)[0], intV.get(i)[1]));
+            }
+            for (Integer i : stringFields) {
+                stringHistogramList.put(i, new StringHistogram(buckets));
+            }
+
+            iter.rewind();
+            while (iter.hasNext()) {
+                Tuple t = iter.next();
+                for (Integer i : intFields) {
+                    intHistogramList.get(i).addValue(((IntField) t.getField(i)).getValue());
+                }
+                for (Integer i : stringFields) {
+                    stringHistogramList.get(i).addValue(((StringField) t.getField(i)).getValue());
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("oops");
+        }
     }
 
     /**
@@ -102,8 +164,10 @@ public class TableStats {
      * @return The estimated cost of scanning the table.
      */
     public double estimateScanCost() {
-        // some code goes here
-        return 0;
+        // wildpea
+        int pageNum = ((HeapFile) dbFile).numPages();
+        //double
+        return pageNum * ioCostPerPage;
     }
 
     /**
@@ -116,8 +180,8 @@ public class TableStats {
      *         selectivityFactor
      */
     public int estimateTableCardinality(double selectivityFactor) {
-        // some code goes here
-        return 0;
+        // wildpea
+        return (int) (totalTups * selectivityFactor);
     }
 
     /**
@@ -131,8 +195,12 @@ public class TableStats {
      * expected selectivity. You may estimate this value from the histograms.
      * */
     public double avgSelectivity(int field, Predicate.Op op) {
-        // some code goes here
-        return 1.0;
+        // wildpea
+        if (intHistogramList.containsKey(field)) {
+            return intHistogramList.get(field).avgSelectivity();
+        } else {
+            return stringHistogramList.get(field).avgSelectivity();
+        }
     }
 
     /**
@@ -149,16 +217,20 @@ public class TableStats {
      *         predicate
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
-        // some code goes here
-        return 1.0;
+        // wildpea
+        if (intHistogramList.containsKey(field)) {
+            return intHistogramList.get(field).estimateSelectivity(op, ((IntField)constant).getValue());
+        } else {
+            return stringHistogramList.get(field).estimateSelectivity(op, ((StringField)constant).getValue());
+        }
     }
 
     /**
      * return the total number of tuples in this table
      * */
     public int totalTuples() {
-        // some code goes here
-        return 0;
+        // wildpea
+        return totalTups;
     }
 
 }

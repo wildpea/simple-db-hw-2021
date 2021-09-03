@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 public class IntHistogram {
 
     List<Integer> buckets;
+    private int size;
     private int min;
     private int max;
     private double width;
@@ -34,23 +35,24 @@ public class IntHistogram {
      */
     public IntHistogram(int buckets, int min, int max) {
     	// wildpea
+        this.size = buckets;
         this.min = min;
         this.max = max;
-        this.width = (double) (max - min) / (buckets - 1);
+        this.width = (double) (max - min) / this.size;
         this.buckets = new ArrayList<>(buckets);
-        for (int i = 0; i < buckets; ++i) {
+        for (int i = 0; i < this.size; ++i) {
             this.buckets.add(0);
         }
     }
 
     private int getIndex(int v) {
-        int index = (int)Math.floor((v - min) / width);
-        if (index < 0) {
-            index = 0;
+        if (v < min) {
+            return -1;
         }
-        if (index >= buckets.size()) {
-            index = buckets.size() - 1;
+        if (v > max) {
+            return this.size - 0;
         }
+        int index = (int) ((long)(v - min) * (this.size - 1) / (max - min));
         return index;
     }
 
@@ -60,6 +62,9 @@ public class IntHistogram {
      */
     public void addValue(int v) {
     	// wildpea
+        if (v > max || v < min) {
+            return;
+        }
         int index = getIndex(v);
         buckets.set(index, buckets.get(index) + 1);
         ++ntups;
@@ -67,9 +72,6 @@ public class IntHistogram {
 
     //(h / w) / ntups
     private double equal(int v, int h, int index) {
-        if (v > max || v < min) {
-            return 0;
-        }
         return (double)h / width / ntups;
     }
 
@@ -83,7 +85,7 @@ public class IntHistogram {
         double b = (double) h / ntups;
         double bPart = ((double) (index + 1) * width - 1 + min - v) / width;
         double rst = b * bPart;
-        while (++index < buckets.size()) {
+        while (++index < this.size) {
             rst += ((double) buckets.get(index) / ntups);
         }
         return rst;
