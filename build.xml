@@ -273,6 +273,8 @@
 
                     <include name="simpledb/IntHistogramTest.class"/>
                     <include name="simpledb/TableStatsTest.class"/>
+                    <include name="simpledb/JoinOptimizerTest.class"/>
+                    <include name="simpledb/systemtest/QueryTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

@@ -231,7 +231,7 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
 
         /*
          * Disable these tests as almost any answer could be defensible
-         * 
+         *
          * cardinality = j.estimateJoinCardinality(new
          * LogicalJoinNode(tableName1, tableName2, Integer.toString(3),
          * Integer.toString(4), Predicate.Op.EQUALS),
@@ -252,6 +252,23 @@ public class JoinOptimizerTest extends SimpleDbTestBase {
          * Assert.assertTrue(cardinality > 800); Assert.assertTrue(cardinality
          * <= 2000);
          */
+//        cardinality = j.estimateJoinCardinality(new LogicalJoinNode(tableName1, tableName2, Integer.toString(3),
+//                        Integer.toString(4), Predicate.Op.EQUALS),
+//                        stats1.estimateTableCardinality(0.8),
+//                        stats2.estimateTableCardinality(0.2), false, false, TableStats.getStatsMap());
+//
+//        // We don't specify in what way statistics should be used to improve these estimates.
+//        // So, just require that they not be entirely unreasonable.
+//        Assert.assertTrue(cardinality > 800);
+//        Assert.assertTrue(cardinality <= 2000);
+//
+//        cardinality = j.estimateJoinCardinality(new LogicalJoinNode(tableName2, tableName1, Integer.toString(3),
+//                        Integer.toString(4), Predicate.Op.EQUALS),
+//                        stats2.estimateTableCardinality(0.2),
+//                        stats1.estimateTableCardinality(0.8), false, false, TableStats.getStatsMap());
+//
+//        Assert.assertTrue(cardinality > 800);
+//        Assert.assertTrue(cardinality <= 2000);
 
         cardinality = j.estimateJoinCardinality(new LogicalJoinNode("t1", "t2",
                 "c" + 3, "c" + 4,

@@ -126,11 +126,15 @@ public class JoinOptimizer {
             // You do not need to implement proper support for these for Lab 3.
             return card1 + cost1 + cost2;
         } else {
-            // Insert your code here.
+            // wildpea
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+
+            //basic nexsted-loops join
+            //joincost(t1 join t2) = scancost(t1) + ntups(t1) x scancost(t2) //IO cost
+            //                       + ntups(t1) x ntups(t2)  //CPU cost
+            return cost1 + card1 * cost2 + card1 * card2;
         }
     }
 
@@ -166,6 +170,20 @@ public class JoinOptimizer {
         }
     }
 
+    private static int getEqualCardinality(int card1, int card2, boolean t1pkey, boolean t2pkey) {
+        if (t1pkey && t2pkey) {
+            return Math.min(card1, card2);
+        } else if (t1pkey || t2pkey) {
+            return Math.max(card1, card2);
+        } else {
+            return Math.max(card1, card2) + 100;
+        }
+    }
+
+    private static int getRangeCardinality(int card1, int card2) {
+        return (int) Math.max(card1, card2) + 200;
+    }
+
     /**
      * Estimate the join cardinality of two tables.
      * */
@@ -174,9 +192,29 @@ public class JoinOptimizer {
                                                    String field2PureName, int card1, int card2, boolean t1pkey,
                                                    boolean t2pkey, Map<String, TableStats> stats,
                                                    Map<String, Integer> tableAliasToId) {
-        int card = 1;
-        // some code goes here
-        return card <= 0 ? 1 : card;
+        int card = Integer.MAX_VALUE;
+
+        // wildpea
+        switch (joinOp) {
+            case EQUALS:
+                card = getEqualCardinality(card1, card2, t1pkey, t2pkey);
+                break;
+            case GREATER_THAN:
+            case LESS_THAN:
+                card = getRangeCardinality(card1, card2);
+                card = getRangeCardinality(card1, card2);
+                break;
+            case LESS_THAN_OR_EQ:
+            case GREATER_THAN_OR_EQ:
+                card = getRangeCardinality(card1, card2) + getEqualCardinality(card1, card2, t1pkey, t2pkey);
+                break;
+            case LIKE:
+                break;
+            case NOT_EQUALS:
+                card = getRangeCardinality(card1, card2) + getRangeCardinality(card1, card2);
+                break;
+        }
+        return Math.min(Math.max(card, 1), Integer.MAX_VALUE);
     }
 
     /**
@@ -236,9 +274,46 @@ public class JoinOptimizer {
             Map<String, Double> filterSelectivities, boolean explain)
             throws ParsingException {
 
-        // some code goes here
+        // wildpea
         //Replace the following
-        return joins;
+
+        //j = set of join nodes
+        //for (i in 1...|j|):
+        //    for s in {all length i subsets of j}
+        //        bestPlan = {}
+        //        for s' in {all length d-1 subsets of s}
+        //            subplan = optjoin(s')
+        //            plan = best way to join (s-s') to subplan
+        //            if (cost(plan) < cost(bestPlan))
+        //                bestPlan = plan
+        //     optjoin(s) = bestPlan
+        //return optjoin(j)
+
+        int len = joins.size();
+        PlanCache pc = new PlanCache();
+        for (int i = 0; i < len; ++i) {
+            Set<Set<LogicalJoinNode>> lenISet = enumerateSubsets(joins, i + 1);
+            if (i == 5) {
+                System.out.println("i");
+            }
+            for (Set<LogicalJoinNode> lenINodes : lenISet) {
+                CostCard beseCostCard = null;
+                for (LogicalJoinNode node : lenINodes) {
+                    CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, node, lenINodes
+                            , beseCostCard != null ? beseCostCard.cost : Double.MAX_VALUE, pc);
+                    if (costCard != null) {
+                        beseCostCard = costCard;
+                    }
+                }
+                if (beseCostCard != null) {
+                    pc.addPlan(lenINodes, beseCostCard.cost, beseCostCard.card, beseCostCard.plan);
+                }
+                if (i == len - 1) {
+                    return pc.getOrder(lenINodes);
+                }
+            }
+        }
+        throw new ParsingException("oops");
     }
 
     // ===================== Private Methods =================================
