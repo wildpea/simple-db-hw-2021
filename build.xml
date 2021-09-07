@@ -272,6 +272,7 @@
 <!--                    <include name="simpledb/Lab2Test.class"/>-->
 
                     <include name="simpledb/IntHistogramTest.class"/>
+                    <include name="simpledb/TableStatsTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

@@ -129,11 +129,12 @@ public class TableStats {
             }
 
             int buckets = Math.max(Math.min(totalTups / 20, 1000), 1);
-            for (Integer i : intFields) {
-                intHistogramList.put(i, new IntHistogram(buckets, intV.get(i)[0], intV.get(i)[1]));
-            }
             for (Integer i : stringFields) {
                 stringHistogramList.put(i, new StringHistogram(buckets));
+            }
+            for (Integer i : intFields) {
+                buckets = Math.max(Math.min(totalTups / 20, intV.get(i)[1] - intV.get(i)[0] + 1), 1);
+                intHistogramList.put(i, new IntHistogram(buckets, intV.get(i)[0], intV.get(i)[1]));
             }
 
             iter.rewind();

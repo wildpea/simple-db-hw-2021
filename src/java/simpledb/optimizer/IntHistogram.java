@@ -34,7 +34,7 @@ public class IntHistogram {
      * @param max The maximum integer value that will ever be passed to this class for histogramming
      */
     public IntHistogram(int buckets, int min, int max) {
-    	// wildpea
+        // wildpea
         this.size = buckets;
         this.min = min;
         this.max = max;
@@ -47,10 +47,10 @@ public class IntHistogram {
 
     private int getIndex(int v) {
         if (v < min) {
-            return -1;
+            return 0;
         }
         if (v > max) {
-            return this.size - 0;
+            return this.size - 1;
         }
         int index = (int) ((long)(v - min) * (this.size - 1) / (max - min));
         return index;
@@ -61,7 +61,7 @@ public class IntHistogram {
      * @param v Value to add to the histogram
      */
     public void addValue(int v) {
-    	// wildpea
+        // wildpea
         if (v > max || v < min) {
             return;
         }
@@ -72,6 +72,7 @@ public class IntHistogram {
 
     //(h / w) / ntups
     private double equal(int v, int h, int index) {
+        if (v > max || v < min) return 0;
         return (double)h / width / ntups;
     }
 
@@ -82,9 +83,8 @@ public class IntHistogram {
         if (v > max) {
             return 0;
         }
-        double b = (double) h / ntups;
-        double bPart = ((double) (index + 1) * width - 1 + min - v) / width;
-        double rst = b * bPart;
+        double bPart = Math.min(((double) (index + 1) * width - 1 + min - v) / width, 1.0);
+        double rst = bPart * h / ntups;
         while (++index < this.size) {
             rst += ((double) buckets.get(index) / ntups);
         }
@@ -95,9 +95,8 @@ public class IntHistogram {
         if (v < min) {
             return 0;
         }
-        double b = (double) h / ntups;
-        double bPart = (v - ((double)index * width + min)) / width;
-        double rst = b * bPart;
+        double bPart = Math.min((v - ((double)index * width + min)) / width, 1);
+        double rst = bPart * h / ntups;
         while (--index >= 0) {
             rst += ((double) buckets.get(index) / ntups);
         }
@@ -106,16 +105,16 @@ public class IntHistogram {
 
     /**
      * Estimate the selectivity of a particular predicate and operand on this table.
-     * 
+     *
      * For example, if "op" is "GREATER_THAN" and "v" is 5, 
      * return your estimate of the fraction of elements that are greater than 5.
-     * 
+     *
      * @param op Operator
      * @param v Value
      * @return Predicted selectivity of this particular operator and value
      */
     public double estimateSelectivity(Predicate.Op op, int v) {
-    	// wildpea
+        // wildpea
         if (ntups == 0) {
             return -1.0;
         }
@@ -141,11 +140,11 @@ public class IntHistogram {
         }
         return -1.0;
     }
-    
+
     /**
      * @return
      *     the average selectivity of this histogram.
-     *     
+     *
      *     This is not an indispensable method to implement the basic
      *     join optimization. It may be needed if you want to
      *     implement a more efficient optimization
@@ -154,7 +153,7 @@ public class IntHistogram {
         // some code goes here
         return 1.0;
     }
-    
+
     /**
      * @return A string describing this histogram, for debugging purposes
      */
