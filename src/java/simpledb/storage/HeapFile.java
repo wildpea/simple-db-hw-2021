@@ -29,7 +29,6 @@ public class HeapFile implements DbFile {
 
     private File f;
     private TupleDesc td;
-    private Map<Integer, Page> newPages = new HashMap<>();
 
     /**
      * Constructs a heap file backed by the specified file.
@@ -88,10 +87,6 @@ public class HeapFile implements DbFile {
             throw new IllegalArgumentException("not current tableId");
         }
 
-        if (newPages.containsKey(pid.getPageNumber())) {
-            return newPages.get(pid.getPageNumber());
-        }
-
         try (RandomAccessFile randomAccessFile = new RandomAccessFile(f, "r")) {
             randomAccessFile.seek(getFileOffset(pid.getPageNumber()));
             byte[] b = new byte[BufferPool.getPageSize()];
@@ -117,8 +112,6 @@ public class HeapFile implements DbFile {
             int pgNo = page.getId().getPageNumber();
             randomAccessFile.seek(getFileOffset(pgNo));
             randomAccessFile.write(page.getPageData());
-
-            newPages.remove(pgNo);
         } catch (Exception e) {
             throw new IOException("write page error");
         }
@@ -129,7 +122,7 @@ public class HeapFile implements DbFile {
      */
     public int numPages() {
         // wildpea
-        return (int) (f.length() / BufferPool.getPageSize()) + newPages.size();
+        return (int) (f.length() / BufferPool.getPageSize());
     }
 
     // see DbFile.java for javadocs
@@ -144,9 +137,15 @@ public class HeapFile implements DbFile {
             page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), Math.max(0, numPages() - 1)), Permissions.READ_WRITE);
             page.insertTuple(t);
         } catch (Exception e) {
-            page = new HeapPage(new HeapPageId(getId(), numPages()), HeapPage.createEmptyPageData());
+            int pgId = numPages();
+            synchronized (this) {
+                if (numPages() == pgId) {
+                    page = new HeapPage(new HeapPageId(getId(), pgId), HeapPage.createEmptyPageData());
+                    writePage(page);
+                }
+            }
+            page = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), Math.max(0, numPages() - 1)), Permissions.READ_WRITE);
             page.insertTuple(t);
-            newPages.put(numPages(), page);
         }
         pgs.add(page);
         return pgs;

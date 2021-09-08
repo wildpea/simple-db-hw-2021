@@ -280,7 +280,10 @@
                     <include name="simpledb/systemtest/QueryTest.class"/>
 
                     <!-- lab4 -->
-                    <include name="simpledb/JoinOptimizerTest.class"/>
+                    <include name="simpledb/LockingTest.class"/>
+                    <include name="simpledb/TransactionTest.class"/>
+                    <include name="simpledb/AbortEvictionTest.class"/>
+                    <include name="simpledb/DeadlockTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

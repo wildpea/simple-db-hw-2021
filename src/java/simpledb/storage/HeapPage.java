@@ -291,7 +291,6 @@ public class HeapPage implements Page {
                 t.setRecordId(new RecordId(pid, i));
                 markSlotUsed(i, true);
                 tuples[i] = t;
-                //markDirty(true, t.);
                 return;
             }
         }

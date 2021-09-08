@@ -1,8 +1,10 @@
 package simpledb.storage;
 
 import simpledb.common.Database;
+import simpledb.common.DeadlockException;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
+import simpledb.transaction.Transaction;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
@@ -44,11 +46,15 @@ public class BufferPool {
             }
         }
 
-        Map<PageId, LockItem> lPgLocks = new HashMap<>();
+        private Map<PageId, LockItem> lPgLocks = new HashMap<>();
+        private Map<TransactionId, Set<TransactionId>> waitList = new HashMap<>();
+        private Random rand;
 
-        LockManager() {}
+        LockManager() {
+            this.rand = new Random();
+        }
 
-        synchronized void lock(TransactionId tid, PageId pid, Permissions perm) {
+        synchronized void lock(TransactionId tid, PageId pid, Permissions perm) throws DeadlockException {
             if (!lPgLocks.containsKey(pid)) {
                 lPgLocks.put(pid, new LockItem());
             }
@@ -58,13 +64,20 @@ public class BufferPool {
                 if (item.readTids.contains(tid)) {
                     return;
                 }
+
                 while (item.writeTid != null && !item.writeTid.equals(tid)) {
                     try {
-                        Thread.sleep(1);
-                    } catch (Exception e) {
+                        if (waitList.containsKey(item.writeTid) && waitList.get(item.writeTid).contains(tid)) {
+                            throw new DeadlockException();
+                        }
+                        waitList.put(tid, new HashSet<>());
+                        waitList.get(tid).add(item.writeTid);
+                        Thread.sleep(rand.nextInt(4));
+                    } catch (InterruptedException e) {
                         return;
                     }
                 }
+                waitList.remove(tid);
                 item.readTids.add(tid);
             } else {
                 //已经有写权限
@@ -74,11 +87,31 @@ public class BufferPool {
                 while (item.writeTid != null
                         || (item.readTids.size() > 0 && !(item.readTids.size() == 1 && item.readTids.get(0).equals(tid))) ) {
                     try {
-                        Thread.sleep(1);
-                    } catch (Exception e) {
+                        waitList.put(tid, new HashSet<>());
+                        if (item.writeTid != null) {
+                            if (waitList.containsKey(item.writeTid) && waitList.get(item.writeTid).contains(tid)) {
+                                waitList.remove(tid);
+                                throw new DeadlockException();
+                            }
+                            waitList.get(tid).add(item.writeTid);
+                        }
+                        for (int i = 0; i < item.readTids.size(); ++i) {
+                            TransactionId t = item.readTids.get(i);
+                            if (!t.equals(tid)) {
+                                if (waitList.containsKey(t) && waitList.get(t).contains(tid)) {
+                                    waitList.remove(tid);
+                                    throw new DeadlockException();
+                                }
+                                waitList.get(tid).add(t);
+                            }
+                        }
+                        Thread.sleep(rand.nextInt(4));
+                    } catch (InterruptedException e) {
                         return;
                     }
                 }
+
+                waitList.remove(tid);
                 item.writeTid = tid;
                 item.readTids.remove(tid);
             }
@@ -128,11 +161,9 @@ public class BufferPool {
     class PageData {
         Page page;
         Date date;
-        ReentrantLock lock;
-        PageData(Page page, Date date, ReentrantLock lock) {
+        PageData(Page page, Date date) {
             this.page = page;
             this.date = date;
-            this.lock = lock;
         }
     }
     private Map<PageId, PageData> pages = new HashMap<>();
@@ -184,7 +215,12 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // wildpea
-        lockManager.lock(tid, pid, perm);
+        try {
+            lockManager.lock(tid, pid, perm);
+        } catch (DeadlockException e) {
+            transactionComplete(tid, false);
+            throw new TransactionAbortedException();
+        }
 
         if (pages.containsKey(pid)) {
             PageData pageData = pages.get(pid);
@@ -198,7 +234,7 @@ public class BufferPool {
         if (pages.size() >= maxNumPages) {
             evictPage();
         }
-        pages.put(pid, new PageData(page, new Date(), null));
+        pages.put(pid, new PageData(page, new Date()));
 
         return page;
     }
@@ -282,13 +318,17 @@ public class BufferPool {
         throws DbException, IOException, TransactionAbortedException {
         // wildpea
         // not necessary for lab1
-        //DbFile file = getPage(tid, t.getRecordId().getPageId(), Permissions.READ_WRITE);
         DbFile file = Database.getCatalog().getDatabaseFile(tableId);
         List<Page> upPgs = file.insertTuple(tid, t);
         for (Page page:upPgs) {
             page.markDirty(true, tid);
             if (!pages.containsKey(page.getId())) {
-                pages.put(page.getId(), new PageData(page, new Date(), null));
+                pages.put(page.getId(), new PageData(page, new Date()));
+                try {
+                    lockManager.lock(tid, page.getId(), Permissions.READ_WRITE);
+                } catch (DeadlockException e) {
+                    throw new TransactionAbortedException();
+                }
             }
         }
     }
@@ -381,7 +421,12 @@ public class BufferPool {
         if (pages.size() == 0) {
             return;
         }
-        PageId pid = pages.values().stream().min(Comparator.comparing(v -> v.date)).get().page.getId();
+        Optional<PageData> minPage = pages.values().stream().filter(v -> v.page.isDirty() == null).min(Comparator.comparing(v -> v.date));
+        if (!minPage.isPresent()) {
+            throw new DbException("no page can evict");
+        }
+
+        PageId pid = minPage.get().page.getId();
         if (pages.get(pid).page.isDirty() != null) {
             try {
                 flushPage(pid);
