@@ -243,6 +243,7 @@
         <RunJunit>
             <batchtest>
                 <fileset dir="${build.test}">
+                    <!-- lab1 -->
                     <include name="simpledb/TupleDescTest.class"/>
                     <include name="simpledb/TupleTest.class"/>
                     <include name="simpledb/CatalogTest.class"/>
@@ -254,6 +255,7 @@
                     <include name="simpledb/systemtest/ScanTest.class"/>
                     <include name="simpledb/Lab1Test.class"/>
 
+                    <!-- lab2 -->
                     <include name="simpledb/PredicateTest.class"/>
                     <include name="simpledb/JoinPredicateTest.class"/>
                     <include name="simpledb/FilterTest.class"/>
@@ -271,10 +273,14 @@
                     <include name="simpledb/systemtest/EvictTest.class"/>
 <!--                    <include name="simpledb/Lab2Test.class"/>-->
 
+                    <!-- lab3 -->
                     <include name="simpledb/IntHistogramTest.class"/>
                     <include name="simpledb/TableStatsTest.class"/>
                     <include name="simpledb/JoinOptimizerTest.class"/>
                     <include name="simpledb/systemtest/QueryTest.class"/>
+
+                    <!-- lab4 -->
+                    <include name="simpledb/JoinOptimizerTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

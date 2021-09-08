@@ -9,6 +9,8 @@ import simpledb.transaction.TransactionId;
 import java.io.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -33,13 +35,10 @@ public class BufferPool {
     private LockManager lockManager = new LockManager();
 
     class LockManager {
-
         class LockItem {
-            ReentrantReadWriteLock lock;
             List<TransactionId> readTids;
             TransactionId writeTid;
             LockItem() {
-                this.lock = new ReentrantReadWriteLock();
                 readTids = new ArrayList<>();
                 writeTid = null;
             }
@@ -56,50 +55,53 @@ public class BufferPool {
             LockItem item = lPgLocks.get(pid);
 
             if (Permissions.READ_ONLY.equals(perm)) {
-                if (item.readTids.contains(tid) || tid.equals(item.writeTid)) {
+                if (item.readTids.contains(tid)) {
                     return;
                 }
-                item.lock.readLock().lock();
+                while (item.writeTid != null && !item.writeTid.equals(tid)) {
+                    try {
+                        Thread.sleep(1);
+                    } catch (Exception e) {
+                        return;
+                    }
+                }
                 item.readTids.add(tid);
             } else {
+                //已经有写权限
                 if (tid.equals(item.writeTid)) {
                     return;
                 }
-                if (item.readTids.contains(tid)) {
-                    item.lock.readLock().unlock();
-                    item.readTids.remove(tid);
+                while (item.writeTid != null
+                        || (item.readTids.size() > 0 && !(item.readTids.size() == 1 && item.readTids.get(0).equals(tid))) ) {
+                    try {
+                        Thread.sleep(1);
+                    } catch (Exception e) {
+                        return;
+                    }
                 }
-                item.lock.writeLock().lock();
                 item.writeTid = tid;
+                item.readTids.remove(tid);
             }
         }
 
-        void unlock(TransactionId tid) {
+        synchronized void unlock(TransactionId tid) {
             lPgLocks.values().forEach(item -> {
                 if (tid.equals(item.writeTid)) {
-                    item.lock.writeLock().unlock();
                     item.writeTid = null;
                 }
-                if (item.readTids.contains(tid)) {
-                    item.lock.readLock().lock();
-                    item.readTids.remove(tid);
-                }
+                item.readTids.remove(tid);
             });
         }
 
-        void unsafeReleasePage(TransactionId tid, PageId pid) {
+        synchronized void unsafeReleasePage(TransactionId tid, PageId pid) {
             LockItem item = lPgLocks.get(pid);
             if (item == null) {
                 return;
             }
             if (tid.equals(item.writeTid)) {
-                item.lock.writeLock().unlock();
                 item.writeTid = null;
             }
-            if (item.readTids.contains(tid)) {
-                item.lock.readLock().lock();
-                item.readTids.remove(tid);
-            }
+            item.readTids.remove(tid);
         }
 
         boolean holdsLock(TransactionId tid, PageId pid) {
