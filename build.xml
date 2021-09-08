@@ -283,7 +283,7 @@
                     <include name="simpledb/LockingTest.class"/>
                     <include name="simpledb/TransactionTest.class"/>
                     <include name="simpledb/AbortEvictionTest.class"/>
-                    <include name="simpledb/DeadlockTest.class"/>
+<!--                    <include name="simpledb/DeadlockTest.class"/>-->
                 </fileset>
             </batchtest>
         </RunJunit>
