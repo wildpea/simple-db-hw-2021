@@ -3,16 +3,15 @@ package simpledb.storage;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.common.DbException;
-import simpledb.common.DeadlockException;
 import simpledb.transaction.TransactionAbortedException;
 import simpledb.transaction.TransactionId;
 
-import javax.xml.crypto.Data;
 import java.io.*;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * BufferPool manages the reading and writing of pages into memory from
@@ -31,6 +30,98 @@ public class BufferPool {
 
     private static int pageSize = DEFAULT_PAGE_SIZE;
     private static int maxNumPages;
+    private LockManager lockManager = new LockManager();
+
+    class LockManager {
+
+        class LockItem {
+            ReentrantReadWriteLock lock;
+            List<TransactionId> readTids;
+            TransactionId writeTid;
+            LockItem() {
+                this.lock = new ReentrantReadWriteLock();
+                readTids = new ArrayList<>();
+                writeTid = null;
+            }
+        }
+
+        Map<PageId, LockItem> lPgLocks = new HashMap<>();
+
+        LockManager() {}
+
+        synchronized void lock(TransactionId tid, PageId pid, Permissions perm) {
+            if (!lPgLocks.containsKey(pid)) {
+                lPgLocks.put(pid, new LockItem());
+            }
+            LockItem item = lPgLocks.get(pid);
+
+            if (Permissions.READ_ONLY.equals(perm)) {
+                if (item.readTids.contains(tid) || tid.equals(item.writeTid)) {
+                    return;
+                }
+                item.lock.readLock().lock();
+                item.readTids.add(tid);
+            } else {
+                if (tid.equals(item.writeTid)) {
+                    return;
+                }
+                if (item.readTids.contains(tid)) {
+                    item.lock.readLock().unlock();
+                    item.readTids.remove(tid);
+                }
+                item.lock.writeLock().lock();
+                item.writeTid = tid;
+            }
+        }
+
+        void unlock(TransactionId tid) {
+            lPgLocks.values().forEach(item -> {
+                if (tid.equals(item.writeTid)) {
+                    item.lock.writeLock().unlock();
+                    item.writeTid = null;
+                }
+                if (item.readTids.contains(tid)) {
+                    item.lock.readLock().lock();
+                    item.readTids.remove(tid);
+                }
+            });
+        }
+
+        void unsafeReleasePage(TransactionId tid, PageId pid) {
+            LockItem item = lPgLocks.get(pid);
+            if (item == null) {
+                return;
+            }
+            if (tid.equals(item.writeTid)) {
+                item.lock.writeLock().unlock();
+                item.writeTid = null;
+            }
+            if (item.readTids.contains(tid)) {
+                item.lock.readLock().lock();
+                item.readTids.remove(tid);
+            }
+        }
+
+        boolean holdsLock(TransactionId tid, PageId pid) {
+            LockItem item = lPgLocks.get(pid);
+            if (item == null) {
+                return false;
+            }
+
+            if (tid.equals(item.writeTid)) {
+                return true;
+            }
+
+            return item.readTids.contains(tid);
+        }
+
+        Set<PageId> getDirtyPages(TransactionId tid) {
+            return lPgLocks.entrySet().stream()
+                    .filter(o -> tid.equals(o.getValue().writeTid))
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toSet());
+        }
+    }
 
     class PageData {
         Page page;
@@ -91,9 +182,7 @@ public class BufferPool {
     public  Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
         // wildpea
-//        if (perm.equals(Permissions.READ_WRITE)) {
-//            lock(pid);
-//        }
+        lockManager.lock(tid, pid, perm);
 
         if (pages.containsKey(pid)) {
             PageData pageData = pages.get(pid);
@@ -122,8 +211,9 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public  void unsafeReleasePage(TransactionId tid, PageId pid) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1|lab2
+        lockManager.unsafeReleasePage(tid, pid);
     }
 
     /**
@@ -132,15 +222,16 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1|lab2
+        lockManager.unlock(tid);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1|lab2
-        return false;
+        return lockManager.holdsLock(tid, p);
     }
 
     /**
@@ -151,8 +242,23 @@ public class BufferPool {
      * @param commit a flag indicating whether we should commit or abort
      */
     public void transactionComplete(TransactionId tid, boolean commit) {
-        // some code goes here
+        // wildpea
         // not necessary for lab1|lab2
+        if (commit) {
+            try {
+                flushPages(tid);
+            } catch (Exception e) {
+                System.out.println("oops");
+            }
+        } else {
+            Set<PageId> lPages = lockManager.getDirtyPages(tid);
+            for (PageId pid : lPages) {
+                if (tid.equals(pages.get(pid).page.isDirty())) {
+                    discardPage(pid);
+                }
+            }
+        }
+        transactionComplete(tid);
     }
 
     /**
@@ -253,8 +359,14 @@ public class BufferPool {
     /** Write all pages of the specified transaction to disk.
      */
     public synchronized  void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
+        // wildpea
         // not necessary for lab1|lab2
+        Set<PageId> lPages = lockManager.getDirtyPages(tid);
+        for (PageId pid: lPages) {
+            if (tid.equals(pages.get(pid).page.isDirty())) {
+                flushPage(pid);
+            }
+        }
     }
 
     /**
