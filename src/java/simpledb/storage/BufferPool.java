@@ -54,9 +54,11 @@ public class BufferPool {
             this.rand = new Random();
         }
 
-        synchronized void lock(TransactionId tid, PageId pid, Permissions perm) throws DeadlockException {
-            if (!lPgLocks.containsKey(pid)) {
-                lPgLocks.put(pid, new LockItem());
+         void lock(TransactionId tid, PageId pid, Permissions perm) throws DeadlockException {
+            synchronized (tid) {
+                if (!lPgLocks.containsKey(pid)) {
+                    lPgLocks.put(pid, new LockItem());
+                }
             }
             LockItem item = lPgLocks.get(pid);
 
@@ -87,22 +89,24 @@ public class BufferPool {
                 while (item.writeTid != null
                         || (item.readTids.size() > 0 && !(item.readTids.size() == 1 && item.readTids.get(0).equals(tid))) ) {
                     try {
-                        waitList.put(tid, new HashSet<>());
-                        if (item.writeTid != null) {
-                            if (waitList.containsKey(item.writeTid) && waitList.get(item.writeTid).contains(tid)) {
-                                waitList.remove(tid);
-                                throw new DeadlockException();
-                            }
-                            waitList.get(tid).add(item.writeTid);
-                        }
-                        for (int i = 0; i < item.readTids.size(); ++i) {
-                            TransactionId t = item.readTids.get(i);
-                            if (!t.equals(tid)) {
-                                if (waitList.containsKey(t) && waitList.get(t).contains(tid)) {
+                        synchronized (lPgLocks) {
+                            waitList.put(tid, new HashSet<>());
+                            if (item.writeTid != null) {
+                                if (waitList.containsKey(item.writeTid) && waitList.get(item.writeTid).contains(tid)) {
                                     waitList.remove(tid);
                                     throw new DeadlockException();
                                 }
-                                waitList.get(tid).add(t);
+                                waitList.get(tid).add(item.writeTid);
+                            }
+                            for (int i = 0; i < item.readTids.size(); ++i) {
+                                TransactionId t = item.readTids.get(i);
+                                if (!t.equals(tid)) {
+                                    if (waitList.containsKey(t) && waitList.get(t).contains(tid)) {
+                                        waitList.remove(tid);
+                                        throw new DeadlockException();
+                                    }
+                                    waitList.get(tid).add(t);
+                                }
                             }
                         }
                         Thread.sleep(rand.nextInt(4));
@@ -117,24 +121,28 @@ public class BufferPool {
             }
         }
 
-        synchronized void unlock(TransactionId tid) {
-            lPgLocks.values().forEach(item -> {
-                if (tid.equals(item.writeTid)) {
-                    item.writeTid = null;
-                }
-                item.readTids.remove(tid);
-            });
+        void unlock(TransactionId tid) {
+            synchronized (lPgLocks) {
+                lPgLocks.values().forEach(item -> {
+                    if (tid.equals(item.writeTid)) {
+                        item.writeTid = null;
+                    }
+                    item.readTids.remove(tid);
+                });
+            }
         }
 
         synchronized void unsafeReleasePage(TransactionId tid, PageId pid) {
-            LockItem item = lPgLocks.get(pid);
-            if (item == null) {
-                return;
-            }
-            if (tid.equals(item.writeTid)) {
-                item.writeTid = null;
-            }
-            item.readTids.remove(tid);
+                LockItem item = lPgLocks.get(pid);
+                if (item == null) {
+                    return;
+                }
+                synchronized (lPgLocks) {
+                    if (tid.equals(item.writeTid)) {
+                        item.writeTid = null;
+                    }
+                }
+                item.readTids.remove(tid);
         }
 
         boolean holdsLock(TransactionId tid, PageId pid) {
