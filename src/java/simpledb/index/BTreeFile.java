@@ -6,6 +6,7 @@ import java.util.*;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.execution.IndexPredicate;
+import simpledb.execution.Predicate;
 import simpledb.execution.Predicate.Op;
 import simpledb.common.DbException;
 import simpledb.common.Debug;
@@ -187,8 +188,32 @@ public class BTreeFile implements DbFile {
 	private BTreeLeafPage findLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreePageId pid, Permissions perm,
                                        Field f)
 					throws DbException, TransactionAbortedException {
-		// some code goes here
-        return null;
+		// wildpea
+		Page page = getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+		if (page instanceof BTreeLeafPage) {
+			return (BTreeLeafPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+		} else if (page instanceof BTreeInternalPage) {
+			BTreeInternalPageIterator iter = new BTreeInternalPageIterator((BTreeInternalPage) page);
+			BTreeEntry next = null;
+			try {
+				while (iter.hasNext()) {
+					next = iter.next();
+					if (next.getKey().compare(Op.GREATER_THAN_OR_EQ, f)) {
+						return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
+					}
+				}
+				if (next != null) {
+					return findLeafPage(tid, dirtypages, next.getRightChild(), perm, f);
+				}
+			} catch (Exception e) {
+				throw new DbException("iterator closed!");
+			}
+			throw new NoSuchElementException("no such element");
+		} else if (page instanceof BTreeRootPtrPage) {
+			BTreePageId pgId = ((BTreeRootPtrPage) page).getHeaderId();
+			return findLeafPage(tid, dirtypages, pgId, perm, f);
+		}
+        throw new DbException("unexpected page type");
 	}
 	
 	/**
@@ -231,7 +256,7 @@ public class BTreeFile implements DbFile {
 	 */
 	public BTreeLeafPage splitLeafPage(TransactionId tid, Map<PageId, Page> dirtypages, BTreeLeafPage page, Field field)
 			throws DbException, IOException, TransactionAbortedException {
-		// some code goes here
+		// wildpea
         //
         // Split the leaf page by adding a new page on the right of the existing
 		// page and moving half of the tuples to the new page.  Copy the middle key up
@@ -268,7 +293,7 @@ public class BTreeFile implements DbFile {
 	public BTreeInternalPage splitInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
 			BTreeInternalPage page, Field field) 
 					throws DbException, IOException, TransactionAbortedException {
-		// some code goes here
+		// wildpea
         //
         // Split the internal page by adding a new page on the right of the existing
 		// page and moving half of the entries to the new page.  Push the middle key up
@@ -564,7 +589,7 @@ public class BTreeFile implements DbFile {
 	 */
 	public void stealFromLeafPage(BTreeLeafPage page, BTreeLeafPage sibling,
 			BTreeInternalPage parent, BTreeEntry entry, boolean isRightSibling) throws DbException {
-		// some code goes here
+		// wildpea
         //
         // Move some of the tuples from the sibling to the page so
 		// that the tuples are evenly distributed. Be sure to update
@@ -643,7 +668,7 @@ public class BTreeFile implements DbFile {
 	public void stealFromLeftInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
 			BTreeInternalPage page, BTreeInternalPage leftSibling, BTreeInternalPage parent,
 			BTreeEntry parentEntry) throws DbException, TransactionAbortedException {
-		// some code goes here
+		// wildpea
         // Move some of the entries from the left sibling to the page so
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
@@ -670,7 +695,7 @@ public class BTreeFile implements DbFile {
 	public void stealFromRightInternalPage(TransactionId tid, Map<PageId, Page> dirtypages,
 			BTreeInternalPage page, BTreeInternalPage rightSibling, BTreeInternalPage parent,
 			BTreeEntry parentEntry) throws DbException, TransactionAbortedException {
-		// some code goes here
+		// wildpea
         // Move some of the entries from the right sibling to the page so
 		// that the entries are evenly distributed. Be sure to update
 		// the corresponding parent entry. Be sure to update the parent
@@ -699,7 +724,7 @@ public class BTreeFile implements DbFile {
 			BTreeLeafPage leftPage, BTreeLeafPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry) 
 					throws DbException, IOException, TransactionAbortedException {
 
-		// some code goes here
+		// wildpea
         //
 		// Move all the tuples from the right page to the left page, update
 		// the sibling pointers, and make the right page available for reuse.
@@ -731,7 +756,7 @@ public class BTreeFile implements DbFile {
 			BTreeInternalPage leftPage, BTreeInternalPage rightPage, BTreeInternalPage parent, BTreeEntry parentEntry) 
 					throws DbException, IOException, TransactionAbortedException {
 		
-		// some code goes here
+		// wildpea
         //
         // Move all the entries from the right page to the left page, update
 		// the parent pointers of the children in the entries that were moved, 
