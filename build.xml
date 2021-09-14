@@ -284,6 +284,10 @@
                     <include name="simpledb/TransactionTest.class"/>
                     <include name="simpledb/AbortEvictionTest.class"/>
                     <include name="simpledb/DeadlockTest.class"/>
+
+                    <!-- lab5 -->
+                    <include name="simpledb/BTreeFileReadTest.class"/>
+                    <include name="simpledb/systemtest/BTreeScanTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

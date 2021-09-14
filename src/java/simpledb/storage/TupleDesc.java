@@ -217,7 +217,7 @@ public class TupleDesc implements Serializable {
             return false;
         }
         // wildpea
-        if (!o.getClass().equals(TupleDesc.class)) {
+        if (!(o instanceof TupleDesc)) {
             return false;
         }
 

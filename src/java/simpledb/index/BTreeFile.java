@@ -191,22 +191,24 @@ public class BTreeFile implements DbFile {
 		// wildpea
 		Page page = getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
 		if (page instanceof BTreeLeafPage) {
+			if (f == null) {
+				return (BTreeLeafPage) page;
+			}
 			return (BTreeLeafPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
 		} else if (page instanceof BTreeInternalPage) {
 			BTreeInternalPageIterator iter = new BTreeInternalPageIterator((BTreeInternalPage) page);
 			BTreeEntry next = null;
-			try {
-				while (iter.hasNext()) {
-					next = iter.next();
-					if (next.getKey().compare(Op.GREATER_THAN_OR_EQ, f)) {
-						return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
-					}
+			while (iter.hasNext()) {
+				next = iter.next();
+				if (f == null) {
+					return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
 				}
-				if (next != null) {
-					return findLeafPage(tid, dirtypages, next.getRightChild(), perm, f);
+				if (next.getKey().compare(Op.GREATER_THAN_OR_EQ, f)) {
+					return findLeafPage(tid, dirtypages, next.getLeftChild(), perm, f);
 				}
-			} catch (Exception e) {
-				throw new DbException("iterator closed!");
+			}
+			if (next != null) {
+				return findLeafPage(tid, dirtypages, next.getRightChild(), perm, f);
 			}
 			throw new NoSuchElementException("no such element");
 		} else if (page instanceof BTreeRootPtrPage) {
