@@ -290,6 +290,10 @@
                     <include name="simpledb/systemtest/BTreeScanTest.class"/>
                     <include name="simpledb/BTreeFileInsertTest.class"/>
                     <include name="simpledb/systemtest/BTreeFileInsertTest.class"/>
+                    <include name="simpledb/BTreeDeadlockTest.class"/>
+                    <include name="simpledb/BTreeFileDeleteTest.class"/>
+                    <include name="simpledb/systemtest/BTreeFileDeleteTest.class"/>
+                    <include name="simpledb/BTreeNextKeyLockingTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>

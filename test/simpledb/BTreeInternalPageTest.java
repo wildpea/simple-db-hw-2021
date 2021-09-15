@@ -307,6 +307,7 @@ public class BTreeInternalPageTest extends SimpleDbTestBase {
 		int deleted = 0;
 		while (entries.size() > 0) {
 			page.deleteKeyAndRightChild(entries.removeFirst());
+			page.deleteKeyAndRightChild(entries.removeFirst());
 			page.deleteKeyAndRightChild(entries.removeLast());
 			deleted += 2;
 			assertEquals(free + deleted, page.getNumEmptySlots());
