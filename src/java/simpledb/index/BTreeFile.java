@@ -3,6 +3,7 @@ package simpledb.index;
 import java.io.*;
 import java.util.*;
 
+import org.omg.CORBA.INTERNAL;
 import simpledb.common.Database;
 import simpledb.common.Permissions;
 import simpledb.execution.IndexPredicate;
@@ -191,12 +192,12 @@ public class BTreeFile implements DbFile {
 		// wildpea
 		Page page = getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
 		if (page instanceof BTreeLeafPage) {
-			if (f == null) {
+			if (Permissions.READ_ONLY.equals(perm)) {
 				return (BTreeLeafPage) page;
 			}
-			return (BTreeLeafPage) getPage(tid, dirtypages, pid, Permissions.READ_ONLY);
+			return (BTreeLeafPage) getPage(tid, dirtypages, pid, perm);
 		} else if (page instanceof BTreeInternalPage) {
-			BTreeInternalPageIterator iter = new BTreeInternalPageIterator((BTreeInternalPage) page);
+			Iterator<BTreeEntry> iter = ((BTreeInternalPage) page).iterator();
 			BTreeEntry next = null;
 			while (iter.hasNext()) {
 				next = iter.next();
@@ -212,8 +213,7 @@ public class BTreeFile implements DbFile {
 			}
 			throw new NoSuchElementException("no such element");
 		} else if (page instanceof BTreeRootPtrPage) {
-			BTreePageId pgId = ((BTreeRootPtrPage) page).getHeaderId();
-			return findLeafPage(tid, dirtypages, pgId, perm, f);
+			return findLeafPage(tid, dirtypages, ((BTreeRootPtrPage) page).getRootId(), perm, f);
 		}
         throw new DbException("unexpected page type");
 	}
@@ -266,8 +266,58 @@ public class BTreeFile implements DbFile {
 		// the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
 		// the sibling pointers of all the affected leaf pages.  Return the page into which a 
 		// tuple with the given key field should be inserted.
-        return null;
-		
+
+		BTreeLeafPage newRightPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+		dirtypages.put(page.getId(), page);
+
+		Iterator<Tuple> iter = page.iterator();
+		int splitNum = page.getNumTuples() / 2;
+		int i = 0;
+		Field splitKey = null;
+		while (iter.hasNext()) {
+			Tuple t = iter.next();
+			++i;
+			if (i > splitNum) {
+				if (splitKey == null) {
+					splitKey = t.getField(keyField);
+				}
+				page.deleteTuple(t);
+				newRightPage.insertTuple(t);
+			}
+		}
+		if (splitKey == null) {
+			throw new DbException("not found splitKey");
+		}
+
+		//更新叶子节点的左右指针
+		if (page.getRightSiblingId() != null) {
+			BTreeLeafPage orgRightPage = (BTreeLeafPage) getPage(tid, dirtypages, page.getRightSiblingId(), Permissions.READ_WRITE);
+			orgRightPage.setLeftSiblingId(newRightPage.getId());
+			newRightPage.setRightSiblingId(orgRightPage.getId());
+		}
+		newRightPage.setLeftSiblingId(page.getId());
+		page.setRightSiblingId(newRightPage.getId());
+
+		//更新到父节点
+		BTreeEntry e = new BTreeEntry(splitKey, page.getId(), newRightPage.getId());
+		Page pPage = getPage(tid, dirtypages, page.getParentId(), Permissions.READ_WRITE);
+		if (pPage instanceof BTreeRootPtrPage) {
+			BTreeInternalPage newRootPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+			newRootPage.insertEntry(e);
+			updateParentPointer(tid, dirtypages, newRootPage.getId(), page.getId());
+			updateParentPointer(tid, dirtypages, newRootPage.getId(), newRightPage.getId());
+			getRootPtrPage(tid, dirtypages).setRootId(newRootPage.getId());
+		} else {
+			BTreeInternalPage iPPage = (BTreeInternalPage) pPage;
+			if (iPPage.getNumEmptySlots() == 0) {
+				iPPage = splitInternalPage(tid, dirtypages, iPPage, splitKey);
+			}
+			iPPage.insertEntry(e);
+			updateParentPointer(tid, dirtypages, iPPage.getId(), page.getId());
+			updateParentPointer(tid, dirtypages, iPPage.getId(), newRightPage.getId());
+		}
+
+		return field.compare(Op.GREATER_THAN, splitKey) ? newRightPage : page;
 	}
 	
 	/**
@@ -304,7 +354,53 @@ public class BTreeFile implements DbFile {
 		// the parent pointers of all the children moving to the new page.  updateParentPointers()
 		// will be useful here.  Return the page into which an entry with the given key field
 		// should be inserted.
-		return null;
+
+		BTreeInternalPage newRightPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+		dirtypages.put(newRightPage.getId(), newRightPage);
+
+		Iterator<BTreeEntry> iter = page.iterator();
+		int splitNum = page.getNumEntries() / 2;
+		int i = 0;
+		BTreeEntry splitEntry = null;
+		while (iter.hasNext()) {
+			BTreeEntry e = iter.next();
+			++i;
+			if (i > splitNum) {
+				page.deleteKeyAndRightChild(e);
+				if (splitEntry == null) {
+					splitEntry = e;
+				} else {
+					newRightPage.insertEntry(e);
+				}
+			}
+		}
+		updateParentPointers(tid, dirtypages, newRightPage);
+		if (splitEntry == null) {
+			throw new DbException("not found split entry");
+		}
+
+		//更新到父节点
+		BTreeEntry e = new BTreeEntry(splitEntry.getKey(), page.getId(), newRightPage.getId());
+		Page pPage = getPage(tid, dirtypages, page.getParentId(), Permissions.READ_WRITE);
+		BTreeRootPtrPage rPage = getRootPtrPage(tid, dirtypages);
+		//先判断当前节点是否为root节点
+		if (page.getId().equals(rPage.getRootId())) {
+			BTreeInternalPage newRootPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+			newRootPage.insertEntry(e);
+			updateParentPointer(tid, dirtypages, newRootPage.getId(), page.getId());
+			updateParentPointer(tid, dirtypages, newRootPage.getId(), newRightPage.getId());
+			rPage.setRootId(newRootPage.getId());
+		} else {
+			BTreeInternalPage iPPage = (BTreeInternalPage) pPage;
+			if (iPPage.getNumEmptySlots() == 0) {
+				iPPage = splitInternalPage(tid, dirtypages, iPPage, splitEntry.getKey());
+			}
+			iPPage.insertEntry(e);
+			updateParentPointer(tid, dirtypages, iPPage.getId(), page.getId());
+			updateParentPointer(tid, dirtypages, iPPage.getId(), newRightPage.getId());
+		}
+
+		return field.compare(Op.GREATER_THAN, splitEntry.getKey()) ? newRightPage : page;
 	}
 	
 	/**

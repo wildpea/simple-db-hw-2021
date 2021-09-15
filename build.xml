@@ -288,6 +288,8 @@
                     <!-- lab5 -->
                     <include name="simpledb/BTreeFileReadTest.class"/>
                     <include name="simpledb/systemtest/BTreeScanTest.class"/>
+                    <include name="simpledb/BTreeFileInsertTest.class"/>
+                    <include name="simpledb/systemtest/BTreeFileInsertTest.class"/>
                 </fileset>
             </batchtest>
         </RunJunit>
